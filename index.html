@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus OLX - Buy, Sell, Exchange in Your Campus</title>
+    <meta name="description" content="Campus OLX is a peer-to-peer academic marketplace for college students to securely buy, sell, and exchange items.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Sticky Navbar -->
+    <header class="navbar">
+        <div class="container nav-container">
+            <a href="#" class="logo" onclick="app.navigate('home')">
+                Campus <span class="text-accent">OLX</span>
+            </a>
+            <nav class="nav-links">
+                <a href="#" onclick="app.navigate('home')">Home</a>
+                <a href="#features" onclick="app.navigate('home')">Features</a>
+                <a href="#" onclick="app.navigate('browse')">Browse</a>
+                <a href="#" onclick="app.navigate('post')">Sell</a>
+                <a href="#about" onclick="app.navigate('home')">About</a>
+            </nav>
+            <button class="btn btn-primary" onclick="app.navigate('post')">
+                <i data-lucide="plus-circle"></i> Post Item
+            </button>
+            <button class="menu-toggle" id="mobile-menu-btn">
+                <i data-lucide="menu"></i>
+            </button>
+        </div>
+    </header>
+
+    <main id="app-content">
+        <!-- View: Home -->
+        <div id="view-home" class="view active">
+            <!-- Hero Section -->
+            <section class="hero relative">
+                <div class="hero-bg-glow"></div>
+                <div class="container hero-container text-center">
+                    <span class="badge badge-campus mb-4"><i data-lucide="map-pin" style="width: 14px; height: 14px; margin-right: 4px;"></i> VVCE Mysuru</span>
+                    <h1 class="hero-title">Buy. Sell. Exchange.<br><span class="text-accent">Within Your Campus.</span></h1>
+                    <p class="hero-subtitle">The premier academic marketplace designed exclusively for college students. Trade textbooks, electronics, and dorm essentials safely.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-large" onclick="app.navigate('browse')">Browse Listings</button>
+                        <button class="btn btn-secondary btn-large" onclick="app.navigate('post')">Post an Item</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Features Section -->
+            <section id="features" class="features section">
+                <div class="container">
+                    <div class="section-header text-center">
+                        <h2>Why use Campus OLX?</h2>
+                        <p>Designed for students, built for trust.</p>
+                    </div>
+                    <div class="features-grid">
+                        <div class="feature-card glass-panel">
+                            <div class="feature-icon"><i data-lucide="shield-check"></i></div>
+                            <h3>Verified Students</h3>
+                            <p>Only verified college students with university email IDs can buy and sell.</p>
+                        </div>
+                        <div class="feature-card glass-panel">
+                            <div class="feature-icon"><i data-lucide="map"></i></div>
+                            <h3>Campus-Specific</h3>
+                            <p>No more traveling far. Buy and sell directly within your campus premises.</p>
+                        </div>
+                        <div class="feature-card glass-panel">
+                            <div class="feature-icon"><i data-lucide="message-square"></i></div>
+                            <h3>Secure Chat</h3>
+                            <p>Communicate directly and securely with sellers without sharing phone numbers.</p>
+                        </div>
+                        <div class="feature-card glass-panel">
+                            <div class="feature-icon"><i data-lucide="tag"></i></div>
+                            <h3>Free to Use</h3>
+                            <p>No hidden fees, no commission. Just pure peer-to-peer exchange.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Browse Listings -->
+        <div id="view-browse" class="view">
+            <section class="browse-header section">
+                <div class="container">
+                    <div class="search-bar glass-panel">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search for textbooks, laptops, notes...">
+                        <button class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="browse-content section pt-0">
+                <div class="container layout-with-sidebar">
+                    <!-- Sidebar Filters -->
+                    <aside class="sidebar glass-panel">
+                        <div class="filter-group">
+                            <h4>Categories</h4>
+                            <ul class="filter-list">
+                                <li><label><input type="radio" name="category" value="all" checked> All Categories</label></li>
+                                <li><label><input type="radio" name="category" value="Books"> Books</label></li>
+                                <li><label><input type="radio" name="category" value="Electronics"> Electronics</label></li>
+                                <li><label><input type="radio" name="category" value="Lab Equipment"> Lab Equipment</label></li>
+                                <li><label><input type="radio" name="category" value="Furniture"> Furniture</label></li>
+                                <li><label><input type="radio" name="category" value="Notes"> Notes</label></li>
+                            </ul>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <h4>Condition</h4>
+                            <ul class="filter-list">
+                                <li><label><input type="checkbox" name="condition" value="New"> New</label></li>
+                                <li><label><input type="checkbox" name="condition" value="Like New"> Like New</label></li>
+                                <li><label><input type="checkbox" name="condition" value="Used"> Used</label></li>
+                            </ul>
+                        </div>
+
+                        <div class="filter-group">
+                            <h4>Price Range</h4>
+                            <div class="price-inputs">
+                                <input type="number" placeholder="Min ₹" class="form-control">
+                                <span>-</span>
+                                <input type="number" placeholder="Max ₹" class="form-control">
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Product Grid -->
+                    <div class="products-container">
+                        <div class="products-header">
+                            <h2 class="h3">Latest Listings</h2>
+                            <select class="form-control sort-select">
+                                <option>Newest First</option>
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                            </select>
+                        </div>
+                        <div class="products-grid" id="products-grid">
+                            <!-- Products injected via JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Post Item -->
+        <div id="view-post" class="view">
+            <section class="post-item-section section">
+                <div class="container">
+                    <div class="form-card glass-panel">
+                        <div class="form-header text-center">
+                            <h2>Post an Item</h2>
+                            <p>Sell your items to students in your campus</p>
+                        </div>
+                        
+                        <form id="post-item-form">
+                            <!-- Image Upload -->
+                            <div class="form-group">
+                                <label>Item Images</label>
+                                <div class="image-upload-zone" id="drop-zone">
+                                    <div class="upload-icon"><i data-lucide="upload-cloud"></i></div>
+                                    <p>Drag & drop or click to upload</p>
+                                    <span class="text-sm text-muted">Supports JPG, PNG, WEBP. Max 5MB.</span>
+                                    <input type="file" id="file-input" hidden multiple accept="image/*">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-2">
+                                    <label for="item-title">Item Title</label>
+                                    <input type="text" id="item-title" class="form-control" placeholder="e.g. Engineering Mathematics Textbook" required>
+                                </div>
+                                <div class="form-group col-1">
+                                    <label for="item-price">Price (₹)</label>
+                                    <input type="number" id="item-price" class="form-control" placeholder="₹0" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-1">
+                                    <label for="item-category">Category</label>
+                                    <select id="item-category" class="form-control" required>
+                                        <option value="" disabled selected>Select category...</option>
+                                        <option value="Books">Books</option>
+                                        <option value="Electronics">Electronics</option>
+                                        <option value="Lab Equipment">Lab Equipment</option>
+                                        <option value="Furniture">Furniture</option>
+                                        <option value="Notes">Notes</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-1">
+                                    <label>Condition</label>
+                                    <div class="radio-group">
+                                        <label class="radio-btn"><input type="radio" name="item-condition" value="New"> <span>New</span></label>
+                                        <label class="radio-btn"><input type="radio" name="item-condition" value="Like New"> <span>Like New</span></label>
+                                        <label class="radio-btn"><input type="radio" name="item-condition" value="Used" checked> <span>Used</span></label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="item-desc">Description</label>
+                                <textarea id="item-desc" class="form-control" rows="4" placeholder="Describe your item, its condition, and any other details..." required></textarea>
+                            </div>
+
+                            <div class="form-actions mt-4">
+                                <button type="button" class="btn btn-secondary" onclick="app.navigate('home')">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-large flex-grow">Post Item Now</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <p>&copy; 2026 Campus OLX. Crafted for students.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
