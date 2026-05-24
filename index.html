@@ -3,83 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campus OLX - Buy, Sell, Exchange in Your Campus</title>
-    <meta name="description" content="Campus OLX is a peer-to-peer academic marketplace for college students to securely buy, sell, and exchange items.">
-    <!-- Google Fonts -->
+    <title>CampusLink — The VVCE Student Super-App</title>
+    <meta name="description" content="CampusLink is a peer-to-peer student marketplace, CollabBoard, Forum, and Chat application exclusively built for Vidyavardhaka College of Engineering.">
+    <!-- Google Fonts: Syne + DM Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Syne:wght@400..800&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+    <!-- View: Authentication Screen -->
+    <div id="auth-page" class="auth-page">
+        <div class="auth-bg-glow"></div>
+        <div class="auth-card glass-panel">
+            <div class="auth-logo">Campus<span class="text-accent">Link</span></div>
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-signin" onclick="app.switchAuthTab('signin')">Sign In</div>
+                <div class="auth-tab" id="tab-signup" onclick="app.switchAuthTab('signup')">Sign Up</div>
+            </div>
+            
+            <!-- Sign In Form -->
+            <form id="signin-form">
+                <div class="form-group" id="signin-email-group">
+                    <label for="signin-email">VVCE Email Address</label>
+                    <input type="email" id="signin-email" class="form-control" placeholder="username@vvce.ac.in" required onblur="app.validateEmail('signin')">
+                    <div class="inline-error">Only @vvce.ac.in email IDs are allowed</div>
+                </div>
+                <div class="form-group">
+                    <label for="signin-password">Password</label>
+                    <div class="password-input-container">
+                        <input type="password" id="signin-password" class="form-control" placeholder="Enter password" required>
+                        <button type="button" class="password-toggle-btn" onclick="app.togglePassword('signin-password')">
+                            <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-large mt-4" id="signin-submit-btn" style="width: 100%;" disabled>
+                    <span>Sign In</span>
+                    <div class="btn-spinner"></div>
+                </button>
+                <div class="auth-footer">
+                    <a href="#" onclick="app.showForgotPassword(event)">Forgot Password?</a>
+                </div>
+            </form>
+            
+            <!-- Sign Up Form -->
+            <form id="signup-form" style="display: none;">
+                <div class="form-group" id="signup-name-group">
+                    <label for="signup-name">Full Name</label>
+                    <input type="text" id="signup-name" class="form-control" placeholder="e.g. Swasthik S" required>
+                </div>
+                <div class="form-group" id="signup-email-group">
+                    <label for="signup-email">VVCE Email Address</label>
+                    <input type="email" id="signup-email" class="form-control" placeholder="username@vvce.ac.in" required onblur="app.validateEmail('signup')">
+                    <div class="inline-error">Only @vvce.ac.in email IDs are allowed</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-1" id="signup-branch-group">
+                        <label for="signup-branch">Branch</label>
+                        <select id="signup-branch" class="form-control" required>
+                            <option value="" disabled selected>Select...</option>
+                            <option value="CSE">CSE</option>
+                            <option value="ISE">ISE</option>
+                            <option value="ECE">ECE</option>
+                            <option value="ME">ME</option>
+                            <option value="CV">CV</option>
+                            <option value="EEE">EEE</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-1" id="signup-semester-group">
+                        <label for="signup-semester">Semester</label>
+                        <select id="signup-semester" class="form-control" required>
+                            <option value="" disabled selected>Select...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" id="signup-phone-group">
+                    <label for="signup-phone">Phone Number</label>
+                    <input type="tel" id="signup-phone" class="form-control" placeholder="10-digit number" pattern="[0-9]{10}" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Password</label>
+                    <div class="password-input-container">
+                        <input type="password" id="signup-password" class="form-control" placeholder="Create password" required>
+                        <button type="button" class="password-toggle-btn" onclick="app.togglePassword('signup-password')">
+                            <i data-lucide="eye" style="width: 18px; height: 18px;"></i>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-large mt-4" id="signup-submit-btn" style="width: 100%;" disabled>
+                    <span>Create Account</span>
+                    <div class="btn-spinner"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- Sticky Navbar -->
-    <header class="navbar">
+    <header class="navbar" id="main-navbar" style="display: none;">
         <div class="container nav-container">
             <a href="#" class="logo" onclick="app.navigate('home')">
-                Campus <span class="text-accent">OLX</span>
+                Campus<span class="text-accent">Link</span>
             </a>
-            <nav class="nav-links">
-                <a href="#" onclick="app.navigate('home')">Home</a>
-                <a href="#features" onclick="app.navigate('home')">Features</a>
-                <a href="#" onclick="app.navigate('browse')">Browse</a>
-                <a href="#" onclick="app.navigate('post')">Sell</a>
-                <a href="#about" onclick="app.navigate('home')">About</a>
+            <nav class="nav-links" id="main-nav-links">
+                <a href="#" class="nav-item nav-home-pill active" onclick="app.navigate('home', event)">Home</a>
+                <a href="#" class="nav-item" onclick="app.navigate('browse', event)">Marketplace <span style="font-size: 0.7rem; opacity: 0.8; vertical-align: middle;">▼</span></a>
+                <a href="#" class="nav-item" onclick="app.navigate('collab', event)">Teams <span style="font-size: 0.7rem; opacity: 0.8; vertical-align: middle;">▼</span></a>
+                <a href="#" class="nav-item" onclick="app.navigate('reddit', event)">Forum <span style="font-size: 0.7rem; opacity: 0.8; vertical-align: middle;">▼</span></a>
+                <a href="#" class="nav-item" onclick="app.navigate('wishlist', event)">Wishlist</a>
+                <a href="#" class="nav-item" id="nav-chat-link" onclick="app.navigate('chat', event)">Messages <span class="badge-unread-dot" id="nav-chat-badge-dot" style="display:none;"></span></a>
+                <a href="#" class="nav-item" onclick="app.navigate('profile', event)">Profile</a>
             </nav>
-            <button class="btn btn-primary" onclick="app.navigate('post')">
-                <i data-lucide="plus-circle"></i> Post Item
-            </button>
-            <button class="menu-toggle" id="mobile-menu-btn">
+            <div class="nav-right-actions">
+                <div class="user-chip-group-wrapper">
+                    <div class="user-chip" id="user-chip" onclick="app.navigate('profile')">
+                        <div class="user-avatar" id="user-chip-avatar">SG</div>
+                        <span id="user-chip-name">Suresh</span>
+                    </div>
+                    <button class="btn btn-switch-user-pill" onclick="app.openSwitchUserModal(event)">Switch User</button>
+                </div>
+            </div>
+            <button class="menu-toggle" id="mobile-menu-btn" onclick="app.toggleMobileMenu()">
                 <i data-lucide="menu"></i>
             </button>
         </div>
     </header>
 
-    <main id="app-content">
+    <main id="app-content" style="display: none;">
         <!-- View: Home -->
         <div id="view-home" class="view active">
             <!-- Hero Section -->
-            <section class="hero relative">
+            <section class="hero relative" style="padding: 4rem 0;">
                 <div class="hero-bg-glow"></div>
                 <div class="container hero-container text-center">
-                    <span class="badge badge-campus mb-4"><i data-lucide="map-pin" style="width: 14px; height: 14px; margin-right: 4px;"></i> VVCE Mysuru</span>
-                    <h1 class="hero-title">Buy. Sell. Exchange.<br><span class="text-accent">Within Your Campus.</span></h1>
-                    <p class="hero-subtitle">The premier academic marketplace designed exclusively for college students. Trade textbooks, electronics, and dorm essentials safely.</p>
-                    <div class="hero-actions">
-                        <button class="btn btn-primary btn-large" onclick="app.navigate('browse')">Browse Listings</button>
-                        <button class="btn btn-secondary btn-large" onclick="app.navigate('post')">Post an Item</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Features Section -->
-            <section id="features" class="features section">
-                <div class="container">
-                    <div class="section-header text-center">
-                        <h2>Why use Campus OLX?</h2>
-                        <p>Designed for students, built for trust.</p>
-                    </div>
-                    <div class="features-grid">
-                        <div class="feature-card glass-panel">
-                            <div class="feature-icon"><i data-lucide="shield-check"></i></div>
-                            <h3>Verified Students</h3>
-                            <p>Only verified college students with university email IDs can buy and sell.</p>
+                    <h1 class="hero-title" style="font-size: 3.5rem; line-height: 1.1; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.5rem; text-transform: none;">One platform. Three superpowers.</h1>
+                    <p class="hero-subtitle" style="font-size: 1.25rem; color: var(--text-muted); margin-bottom: 3.5rem; font-weight: 500;">Built exclusively for VVCE.</p>
+                    
+                    <!-- Superpowers Grid -->
+                    <div class="superpowers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; text-align: left; margin-top: 2rem;">
+                        <!-- Superpower 1: Marketplace -->
+                        <div class="superpower-card superpower-marketplace glass-panel" style="padding: 2.25rem; border-radius: var(--radius-lg); border-top: 4px solid var(--accent-yellow); display: flex; flex-direction: column; height: 100%;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📦</div>
+                            <h2 style="font-size: 1.6rem; margin-bottom: 0.75rem; font-family: 'Syne', sans-serif;">CampusLink Marketplace</h2>
+                            <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem; flex-grow: 1;">Buy & sell second-hand books, calculators, and lab gear with your VVCE batchmates.</p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+                                <button class="btn btn-primary" onclick="app.navigate('browse')" style="background-color: var(--accent-yellow); color: var(--text-dark); flex-grow: 1; font-weight:700;">Browse</button>
+                                <button class="btn btn-secondary" onclick="app.navigate('post')" style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1.25rem; border-radius: var(--radius-full);">Sell</button>
+                            </div>
                         </div>
-                        <div class="feature-card glass-panel">
-                            <div class="feature-icon"><i data-lucide="map"></i></div>
-                            <h3>Campus-Specific</h3>
-                            <p>No more traveling far. Buy and sell directly within your campus premises.</p>
+                        
+                        <!-- Superpower 2: Teams -->
+                        <div class="superpower-card superpower-teams glass-panel" style="padding: 2.25rem; border-radius: var(--radius-lg); border-top: 4px solid #10b981; display: flex; flex-direction: column; height: 100%;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🤝</div>
+                            <h2 style="font-size: 1.6rem; margin-bottom: 0.75rem; font-family: 'Syne', sans-serif;">CampusLink Teams</h2>
+                            <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem; flex-grow: 1;">Find your hackathon squad. Build teams. Win together.</p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+                                <button class="btn btn-primary" onclick="app.navigate('collab')" style="background-color: #10b981; color: var(--text-dark); flex-grow: 1; font-weight:700; box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);">Find Team Members</button>
+                                <button class="btn btn-secondary" onclick="app.openModal('create-team-modal')" style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1.25rem; border-radius: var(--radius-full);">Post Event</button>
+                            </div>
                         </div>
-                        <div class="feature-card glass-panel">
-                            <div class="feature-icon"><i data-lucide="message-square"></i></div>
-                            <h3>Secure Chat</h3>
-                            <p>Communicate directly and securely with sellers without sharing phone numbers.</p>
-                        </div>
-                        <div class="feature-card glass-panel">
-                            <div class="feature-icon"><i data-lucide="tag"></i></div>
-                            <h3>Free to Use</h3>
-                            <p>No hidden fees, no commission. Just pure peer-to-peer exchange.</p>
+                        
+                        <!-- Superpower 3: Forum -->
+                        <div class="superpower-card superpower-forum glass-panel" style="padding: 2.25rem; border-radius: var(--radius-lg); border-top: 4px solid #8b5cf6; display: flex; flex-direction: column; height: 100%;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">💬</div>
+                            <h2 style="font-size: 1.6rem; margin-bottom: 0.75rem; font-family: 'Syne', sans-serif;">CampusLink Forum</h2>
+                            <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem; flex-grow: 1;">Ask anything. Get answers from seniors who've been there.</p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+                                <button class="btn btn-primary" onclick="app.openModal('new-reddit-post-modal')" style="background-color: #8b5cf6; color: var(--text-main); flex-grow: 1; font-weight:700; box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);">Ask a Question</button>
+                                <button class="btn btn-secondary" onclick="app.navigate('reddit')" style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1.25rem; border-radius: var(--radius-full);">Browse Forum</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -92,8 +195,8 @@
                 <div class="container">
                     <div class="search-bar glass-panel">
                         <i data-lucide="search" class="search-icon"></i>
-                        <input type="text" id="search-input" placeholder="Search for textbooks, laptops, notes...">
-                        <button class="btn btn-primary">Search</button>
+                        <input type="text" id="search-input" placeholder="Search for textbooks, laptops, notes..." oninput="app.filterListings()">
+                        <button class="btn btn-primary" onclick="app.filterListings()">Search</button>
                     </div>
                 </div>
             </section>
@@ -105,30 +208,30 @@
                         <div class="filter-group">
                             <h4>Categories</h4>
                             <ul class="filter-list">
-                                <li><label><input type="radio" name="category" value="all" checked> All Categories</label></li>
-                                <li><label><input type="radio" name="category" value="Books"> Books</label></li>
-                                <li><label><input type="radio" name="category" value="Electronics"> Electronics</label></li>
-                                <li><label><input type="radio" name="category" value="Lab Equipment"> Lab Equipment</label></li>
-                                <li><label><input type="radio" name="category" value="Furniture"> Furniture</label></li>
-                                <li><label><input type="radio" name="category" value="Notes"> Notes</label></li>
+                                <li><label><input type="radio" name="category" value="all" checked onchange="app.filterListings()"> All Categories</label></li>
+                                <li><label><input type="radio" name="category" value="Books" onchange="app.filterListings()"> Books</label></li>
+                                <li><label><input type="radio" name="category" value="Electronics" onchange="app.filterListings()"> Electronics</label></li>
+                                <li><label><input type="radio" name="category" value="Lab Equipment" onchange="app.filterListings()"> Lab Equipment</label></li>
+                                <li><label><input type="radio" name="category" value="Furniture" onchange="app.filterListings()"> Furniture</label></li>
+                                <li><label><input type="radio" name="category" value="Notes" onchange="app.filterListings()"> Notes</label></li>
                             </ul>
                         </div>
                         
                         <div class="filter-group">
                             <h4>Condition</h4>
-                            <ul class="filter-list">
-                                <li><label><input type="checkbox" name="condition" value="New"> New</label></li>
-                                <li><label><input type="checkbox" name="condition" value="Like New"> Like New</label></li>
-                                <li><label><input type="checkbox" name="condition" value="Used"> Used</label></li>
+                            <ul class="filter-list" id="browse-condition-filters">
+                                <li><label><input type="checkbox" name="condition" value="New" onchange="app.filterListings()"> New</label></li>
+                                <li><label><input type="checkbox" name="condition" value="Like New" onchange="app.filterListings()"> Like New</label></li>
+                                <li><label><input type="checkbox" name="condition" value="Used" onchange="app.filterListings()"> Used</label></li>
                             </ul>
                         </div>
 
                         <div class="filter-group">
                             <h4>Price Range</h4>
                             <div class="price-inputs">
-                                <input type="number" placeholder="Min ₹" class="form-control">
+                                <input type="number" id="filter-price-min" placeholder="Min ₹" class="form-control" oninput="app.filterListings()">
                                 <span>-</span>
-                                <input type="number" placeholder="Max ₹" class="form-control">
+                                <input type="number" id="filter-price-max" placeholder="Max ₹" class="form-control" oninput="app.filterListings()">
                             </div>
                         </div>
                     </aside>
@@ -137,10 +240,10 @@
                     <div class="products-container">
                         <div class="products-header">
                             <h2 class="h3">Latest Listings</h2>
-                            <select class="form-control sort-select">
-                                <option>Newest First</option>
-                                <option>Price: Low to High</option>
-                                <option>Price: High to Low</option>
+                            <select class="form-control sort-select" id="sort-select" onchange="app.filterListings()">
+                                <option value="newest">Newest First</option>
+                                <option value="low-to-high">Price: Low to High</option>
+                                <option value="high-to-low">Price: High to Low</option>
                             </select>
                         </div>
                         <div class="products-grid" id="products-grid">
@@ -212,7 +315,7 @@
                             </div>
 
                             <div class="form-actions mt-4">
-                                <button type="button" class="btn btn-secondary" onclick="app.navigate('home')">Cancel</button>
+                                <button type="button" class="btn btn-secondary" onclick="app.navigate('browse')">Cancel</button>
                                 <button type="submit" class="btn btn-primary btn-large flex-grow">Post Item Now</button>
                             </div>
                         </form>
@@ -220,12 +323,568 @@
                 </div>
             </section>
         </div>
+
+        <!-- View: CollabBoard -->
+        <div id="view-collab" class="view">
+            <section class="section">
+                <div class="container">
+                    <div class="section-header text-center">
+                        <h2>CollabBoard</h2>
+                        <p>Form project teams, find study partners, and coordinate hacks</p>
+                    </div>
+                    <div class="text-center mb-4">
+                        <button class="btn btn-primary" onclick="app.openModal('create-team-modal')">
+                            <i data-lucide="plus-circle"></i> Create a Team
+                        </button>
+                    </div>
+                    
+                    <!-- Skill Filters -->
+                    <div class="skills-filter-container" id="collab-skills-filters">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                    
+                    <div class="products-grid" id="collab-teams-grid">
+                        <!-- Injected dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Hackathons -->
+        <div id="view-hackathons" class="view">
+            <section class="section pt-4">
+                <div class="container">
+                    <div class="hackathon-hero">
+                        <div class="hackathon-hero-glow"></div>
+                        <h2 class="hero-title" style="font-size:2.5rem; margin-bottom: 0.5rem;">VVCE Hackathons Hub</h2>
+                        <p class="text-muted" style="max-width: 600px; font-size:1.05rem;">Discover national and college-level hackathons. Form teams, track schedules, and register directly to compete.</p>
+                        
+                        <div class="hackathon-stats-row">
+                            <div class="hackathon-stat-item">
+                                <div class="hackathon-stat-num" id="hack-stat-count">3</div>
+                                <div class="hackathon-stat-label">Active Contests</div>
+                            </div>
+                            <div class="hackathon-stat-item">
+                                <div class="hackathon-stat-num" id="hack-stat-registrations">12</div>
+                                <div class="hackathon-stat-label">Total Teams Registered</div>
+                            </div>
+                            <div class="hackathon-stat-item">
+                                <div class="hackathon-stat-num" id="hack-stat-prizes">₹2.5 Lakhs</div>
+                                <div class="hackathon-stat-label">Cumulative Prizes</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="products-grid" id="hackathons-grid">
+                        <!-- Injected dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Reddit Community -->
+        <div id="view-reddit" class="view">
+            <section class="section pt-4">
+                <div class="container">
+                    <div class="reddit-layout">
+                        <!-- Reddit Sidebar (r/ subreddits) -->
+                        <aside class="reddit-sidebar glass-panel" style="padding: 1.25rem;">
+                            <h4 style="font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin-bottom: 1rem; padding-left:0.5rem;">Sub-Communities</h4>
+                            <div class="subreddit-list" id="subreddit-list">
+                                <div class="subreddit-item active" onclick="app.selectSubreddit('all', event)">
+                                    <div class="subreddit-icon">A</div>
+                                    <span>r/all</span>
+                                </div>
+                                <div class="subreddit-item" onclick="app.selectSubreddit('vvce_coders', event)">
+                                    <div class="subreddit-icon">C</div>
+                                    <span>r/vvce_coders</span>
+                                </div>
+                                <div class="subreddit-item" onclick="app.selectSubreddit('placements', event)">
+                                    <div class="subreddit-icon">P</div>
+                                    <span>r/placements</span>
+                                </div>
+                                <div class="subreddit-item" onclick="app.selectSubreddit('hostel_tales', event)">
+                                    <div class="subreddit-icon">H</div>
+                                    <span>r/hostel_tales</span>
+                                </div>
+                                <div class="subreddit-item" onclick="app.selectSubreddit('general', event)">
+                                    <div class="subreddit-icon">G</div>
+                                    <span>r/general</span>
+                                </div>
+                            </div>
+                        </aside>
+
+                        <!-- Reddit Feed (Middle Column) -->
+                        <div class="reddit-feed">
+                            <!-- Premium Search & Sort bar -->
+                            <div class="browse-header glass-panel" style="padding: 0.5rem; border-radius: var(--radius-md); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <i data-lucide="search" class="search-icon" style="margin-left: 0.5rem;"></i>
+                                <input type="text" id="reddit-search-input" placeholder="Search threads in r/all..." oninput="app.filterRedditPosts()" style="flex:1; background:transparent; border:none; color:var(--text-main); font-family:inherit; outline:none; font-size:0.95rem;">
+                                <button class="btn btn-primary btn-sm" onclick="app.openModal('new-reddit-post-modal')">
+                                    <i data-lucide="plus"></i> Create Post
+                                </button>
+                            </div>
+
+                            <div class="reddit-sort-bar glass-panel" style="border-radius: var(--radius-md);">
+                                <span class="text-xs text-muted" style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 0.5rem;">Sort by:</span>
+                                <div class="reddit-sort-btn active" id="sort-reddit-hot" onclick="app.sortReddit('hot')">
+                                    <i data-lucide="flame" style="width:14px; height:14px;"></i> Hot
+                                </div>
+                                <div class="reddit-sort-btn" id="sort-reddit-new" onclick="app.sortReddit('new')">
+                                    <i data-lucide="clock" style="width:14px; height:14px;"></i> New
+                                </div>
+                                <div class="reddit-sort-btn" id="sort-reddit-top" onclick="app.sortReddit('top')">
+                                    <i data-lucide="trending-up" style="width:14px; height:14px;"></i> Top
+                                </div>
+                            </div>
+
+                            <div id="reddit-posts-feed">
+                                <!-- Reddit Post Cards Injected dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Reddit Side Widgets (Right Column) -->
+                        <div class="reddit-widgets">
+                            <!-- Widget 1: Campus Rules -->
+                            <div class="reddit-widget glass-panel">
+                                <div class="widget-title">VVCE Guidelines</div>
+                                <ul style="font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:0.5rem;">
+                                    <li>1. Respect fellow Vidyavardhaka peers.</li>
+                                    <li>2. Keep discussions academically relevant.</li>
+                                    <li>3. No spam, advertisements, or harassment.</li>
+                                    <li>4. Verify details before listing items on sale.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Widget 2: Placement Insights -->
+                            <div class="reddit-widget glass-panel">
+                                <div class="widget-title">r/placements Stats</div>
+                                <div class="widget-list">
+                                    <div class="widget-list-item">
+                                        <span class="widget-sub-name">Highest CTC (2025)</span>
+                                        <span class="widget-sub-stat" style="color: var(--accent-yellow); font-weight:700;">₹21 LPA</span>
+                                    </div>
+                                    <div class="widget-list-item">
+                                        <span class="widget-sub-name">Avg CS/IS CTC</span>
+                                        <span class="widget-sub-stat">₹6.2 LPA</span>
+                                    </div>
+                                    <div class="widget-list-item">
+                                        <span class="widget-sub-name">Total Offers (YTD)</span>
+                                        <span class="widget-sub-stat" style="color:var(--accent-indigo); font-weight:700;">450+ Offers</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Chat -->
+        <div id="view-chat" class="view">
+            <section class="section pt-0">
+                <div class="container">
+                    <div class="chat-container">
+                        <!-- Chat Sidebar -->
+                        <aside class="chat-sidebar" id="chat-sidebar">
+                            <div class="chat-sidebar-header">
+                                <h4>Conversations</h4>
+                            </div>
+                            <div class="chat-thread-list" id="chat-thread-list">
+                                <!-- Injected dynamically via JS -->
+                            </div>
+                        </aside>
+                        
+                        <!-- Chat Pane -->
+                        <div class="chat-pane" id="chat-pane" style="flex:1;">
+                            <!-- Empty state -->
+                            <div class="chat-empty-state" id="chat-empty-state" style="height: 100%;">
+                                <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 1rem; color: var(--text-muted);"></i>
+                                <h4>No conversation active</h4>
+                                <p>Select a student from the sidebar or click Buy/Contact on a marketplace item to start chatting.</p>
+                            </div>
+                            
+                            <!-- Active conversation -->
+                            <div class="chat-pane-content" id="chat-pane-content" style="display: none; flex-direction: column; height: 100%;">
+                                <div class="chat-pane-header">
+                                    <button class="btn btn-secondary" id="chat-back-btn" onclick="app.toggleChatSidebar(true)" style="display: none; padding: 0.25rem 0.5rem; margin-right: 0.5rem; border-radius: var(--radius-md);">
+                                        <i data-lucide="arrow-left" style="width:16px; height:16px;"></i>
+                                    </button>
+                                    <div class="user-avatar" id="chat-header-avatar">?</div>
+                                    <div style="flex:1;">
+                                        <div class="chat-pane-user-name" id="chat-header-name">Student Name</div>
+                                        <div class="chat-pane-user-branch" id="chat-header-branch">CSE</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="chat-messages-viewport" id="chat-messages-viewport">
+                                    <!-- Dynamic bubbles -->
+                                </div>
+                                
+                                <form id="chat-send-form" class="chat-input-area">
+                                    <input type="text" id="chat-message-input" class="form-control" placeholder="Type a message..." required autocomplete="off">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i data-lucide="send"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: Profile -->
+        <div id="view-profile" class="view">
+            <section class="section">
+                <div class="container">
+                    <div class="profile-grid">
+                        <!-- Profile Left Column -->
+                        <aside class="sidebar glass-panel profile-card">
+                            <div class="profile-avatar-large" id="profile-avatar-large">S</div>
+                            <h3 class="profile-name" id="profile-full-name">Student Name</h3>
+                            <div class="profile-branch-sem" id="profile-branch-sem">ISE | Semester 6</div>
+                            
+                            <div class="karma-badge-container">
+                                <div class="karma-title">🔥 Karma Score</div>
+                                <div class="karma-value" id="profile-karma-value">0</div>
+                            </div>
+                            
+                            <div class="text-center" style="margin-top: 1.5rem;">
+                                <button class="btn btn-primary btn-sm" onclick="app.openModal('edit-profile-modal')" style="width: 100%;">
+                                    <i data-lucide="edit"></i> Edit Profile
+                                </button>
+                            </div>
+                            
+                            <div class="profile-links">
+                                <a href="#" id="profile-link-github" class="profile-link-btn" target="_blank" style="display: none;"><i data-lucide="github"></i></a>
+                                <a href="#" id="profile-link-linkedin" class="profile-link-btn" target="_blank" style="display: none;"><i data-lucide="linkedin"></i></a>
+                            </div>
+                        </aside>
+                        
+                        <!-- Profile Right Column -->
+                        <div class="profile-details-container glass-panel" style="padding: 2.5rem;">
+                            <div class="profile-bio-box">
+                                <h4 class="profile-section-title">About Me</h4>
+                                <p class="profile-bio-text empty" id="profile-bio">No bio description added yet. Tell people about yourself, your interests, and what items you are looking for.</p>
+                            </div>
+                            
+                            <div class="profile-bio-box">
+                                <h4 class="profile-section-title">My Skills</h4>
+                                <div class="tag-list" id="profile-skills-list">
+                                    <span class="text-muted italic" id="profile-skills-placeholder">No skills listed yet.</span>
+                                </div>
+                            </div>
+                            
+                            <div class="profile-activity-section" style="margin-top: 2.5rem;">
+                                <div class="profile-tabs-header">
+                                    <div class="profile-tab-title active" id="profile-tab-listings" onclick="app.switchProfileTab('listings')">Listed Items</div>
+                                    <div class="profile-tab-title" id="profile-tab-teams" onclick="app.switchProfileTab('teams')">Teams</div>
+                                    <div class="profile-tab-title" id="profile-tab-posts" onclick="app.switchProfileTab('posts')">Forum Posts</div>
+                                </div>
+                                
+                                <div class="profile-pane active" id="profile-pane-listings">
+                                    <div class="products-grid" id="profile-listings-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                                        <!-- Injected dynamically -->
+                                    </div>
+                                </div>
+                                
+                                <div class="profile-pane" id="profile-pane-teams">
+                                    <div class="products-grid" id="profile-teams-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                                        <!-- Injected dynamically -->
+                                    </div>
+                                </div>
+                                
+                                <div class="profile-pane" id="profile-pane-posts">
+                                    <div class="forum-feed" id="profile-posts-grid">
+                                        <!-- Injected dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reset Password</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('forgot-password-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="forgot-password-form">
+                    <p class="text-muted mb-4" style="font-size:0.9rem;">Enter your registered @vvce.ac.in email address. We will send you instructions to reset your password.</p>
+                    <div class="form-group" id="reset-email-group">
+                        <label for="reset-email">VVCE Email Address</label>
+                        <input type="email" id="reset-email" class="form-control" placeholder="username@vvce.ac.in" required onblur="app.validateEmail('reset')">
+                        <div class="inline-error">Only @vvce.ac.in email IDs are allowed</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-4" id="reset-submit-btn" style="width: 100%;" disabled>
+                        <span>Send Reset Link</span>
+                        <div class="btn-spinner"></div>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Listing Modal -->
+    <div id="edit-listing-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Item</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('edit-listing-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-listing-form">
+                    <input type="hidden" id="edit-item-id">
+                    <div class="form-group">
+                        <label for="edit-item-title">Item Title</label>
+                        <input type="text" id="edit-item-title" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-2">
+                            <label for="edit-item-price">Price (₹)</label>
+                            <input type="number" id="edit-item-price" class="form-control" required>
+                        </div>
+                        <div class="form-group col-1">
+                            <label for="edit-item-category">Category</label>
+                            <select id="edit-item-category" class="form-control" required>
+                                <option value="Books">Books</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Lab Equipment">Lab Equipment</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Notes">Notes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Condition</label>
+                        <div class="radio-group">
+                            <label class="radio-btn"><input type="radio" name="edit-item-condition" value="New" id="edit-cond-new"> <span>New</span></label>
+                            <label class="radio-btn"><input type="radio" name="edit-item-condition" value="Like New" id="edit-cond-likenew"> <span>Like New</span></label>
+                            <label class="radio-btn"><input type="radio" name="edit-item-condition" value="Used" id="edit-cond-used"> <span>Used</span></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-item-desc">Description</label>
+                        <textarea id="edit-item-desc" class="form-control" rows="4" required></textarea>
+                    </div>
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('edit-listing-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary flex-grow">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create a Project Team</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('create-team-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="create-team-form">
+                    <div class="form-group">
+                        <label for="team-name">Project / Team Name</label>
+                        <input type="text" id="team-name" class="form-control" placeholder="e.g. CampusLink Mobile App" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-desc">Description & Objective</label>
+                        <textarea id="team-desc" class="form-control" rows="3" placeholder="What is your team building or studying?" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-skills">Skills Required (comma-separated)</label>
+                        <input type="text" id="team-skills" class="form-control" placeholder="e.g. React, UI/UX, Python" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-roles">Open Roles (comma-separated)</label>
+                        <input type="text" id="team-roles" class="form-control" placeholder="e.g. Frontend Developer, Designer" required>
+                    </div>
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('create-team-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary flex-grow">Create Team</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Hackathon Modal -->
+    <div id="register-hackathon-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="hack-reg-title">Register Team: Hackathon</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('register-hackathon-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="register-hackathon-form">
+                    <input type="hidden" id="reg-hackathon-id">
+                    <div class="form-group">
+                        <label for="reg-team-name">Team Name</label>
+                        <input type="text" id="reg-team-name" class="form-control" placeholder="e.g. VVCE Innovators" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-members">Team Members (names, comma-separated)</label>
+                        <textarea id="reg-members" class="form-control" rows="2" placeholder="e.g. Swasthik (CSE), Priya (ISE), Rahul (CSE)" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-phone">Leader Contact Number</label>
+                        <input type="tel" id="reg-phone" class="form-control" placeholder="10-digit number" pattern="[0-9]{10}" required>
+                    </div>
+                    <div class="form-actions mt-4">
+                         <button type="button" class="btn btn-secondary" onclick="app.closeModal('register-hackathon-modal')">Cancel</button>
+                         <button type="submit" class="btn btn-primary flex-grow">Complete Registration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Reddit Post Modal -->
+    <div id="new-reddit-post-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Community Post</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('new-reddit-post-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="new-reddit-post-form">
+                    <div class="form-group">
+                        <label for="reddit-post-sub">Choose Subreddit</label>
+                        <select id="reddit-post-sub" class="form-control" required>
+                            <option value="" disabled selected>Select subreddit...</option>
+                            <option value="vvce_coders">r/vvce_coders</option>
+                            <option value="placements">r/placements</option>
+                            <option value="hostel_tales">r/hostel_tales</option>
+                            <option value="general">r/general</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reddit-post-title">Post Title</label>
+                        <input type="text" id="reddit-post-title" class="form-control" placeholder="Title of your post..." required autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="reddit-post-flair">Flair Badge</label>
+                        <select id="reddit-post-flair" class="form-control" required>
+                            <option value="" disabled selected>Select flair...</option>
+                            <option value="Question">Question</option>
+                            <option value="Announcement">Announcement</option>
+                            <option value="Guide">Guide</option>
+                            <option value="Discussion">Discussion</option>
+                            <option value="Meme">Meme</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reddit-post-body">Content Body</label>
+                        <textarea id="reddit-post-body" class="form-control" rows="5" placeholder="Share your details, questions, or ideas..." required></textarea>
+                    </div>
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('new-reddit-post-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary flex-grow">Publish to Subreddit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Applicants Modal -->
+    <div id="manage-applicants-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="manage-modal-title">Applicants: Project Name</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('manage-applicants-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="applicants-list" id="applicants-list-container">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="edit-profile-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Profile</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('edit-profile-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-profile-form">
+                    <div class="form-group">
+                        <label for="edit-bio">Bio Description</label>
+                        <textarea id="edit-bio" class="form-control" rows="3" placeholder="Tell people about yourself..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-skills">Skills (comma-separated)</label>
+                        <input type="text" id="edit-skills" class="form-control" placeholder="e.g. HTML, CSS, JavaScript, Photoshop">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-1">
+                            <label for="edit-github">GitHub Username</label>
+                            <input type="text" id="edit-github" class="form-control" placeholder="username">
+                        </div>
+                        <div class="form-group col-1">
+                            <label for="edit-linkedin">LinkedIn Username</label>
+                            <input type="text" id="edit-linkedin" class="form-control" placeholder="username">
+                        </div>
+                    </div>
+                    <div class="form-actions mt-4">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('edit-profile-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary flex-grow">Save Profile</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Switch User Modal -->
+    <div id="switch-user-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="users" style="width:20px; height:20px; color:var(--accent-yellow);"></i> Switch Student Account</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('switch-user-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <p class="text-muted mb-4" style="font-size:0.875rem; line-height:1.4;">Select a VVCE student account to switch sessions instantly. Test user-to-user marketplace deals, hackathon registrations, and subreddit chats!</p>
+                <div id="switch-user-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-wrap" id="toast-container"></div>
+
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" id="main-footer" style="display: none;">
         <div class="container text-center">
-            <p>&copy; 2026 Campus OLX. Crafted for students.</p>
+            <p>&copy; 2026 CampusLink. Crafted for Vidyavardhaka College of Engineering students.</p>
         </div>
     </footer>
 
