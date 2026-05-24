@@ -6605,9 +6605,30 @@ const app = {
        ========================================================================== */
 
     chatWithAiAboutListing(productId) {
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-        const item = listings.find(i => i.id === productId);
-        if (!item) return;
+        let listings = [];
+        if (this.isSupabaseEnabled()) {
+            listings = this.currentListingsCache || [];
+        }
+        if (!listings || listings.length === 0) {
+            listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        }
+
+        let item = listings.find(i => i.id === productId);
+        if (!item) {
+            item = {
+                id: productId,
+                title: "this item",
+                price: 500,
+                sellerName: "the seller",
+                condition: "good",
+                category: "General",
+                description: "No details available."
+            };
+        } else {
+            if (!item.sellerName && item.seller_name) {
+                item.sellerName = item.seller_name;
+            }
+        }
 
         sessionStorage.setItem('cl_active_ai_item_id', productId);
         this.activeChatEmail = "campuslink_ai";
@@ -6639,9 +6660,34 @@ const app = {
     },
 
     generateAiResponse(userInput) {
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        let listings = [];
+        if (this.isSupabaseEnabled()) {
+            listings = this.currentListingsCache || [];
+        }
+        if (!listings || listings.length === 0) {
+            listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        }
+
         const activeItemId = sessionStorage.getItem('cl_active_ai_item_id');
-        const item = listings.find(i => i.id == activeItemId) || listings[0];
+        let rawItem = listings.find(i => i.id == activeItemId) || listings[0];
+        
+        const fallbackItem = {
+            title: "this item",
+            price: 500,
+            sellerName: "the seller",
+            condition: "good",
+            category: "General",
+            description: "No details available."
+        };
+
+        const item = rawItem ? {
+            title: rawItem.title || "this item",
+            price: rawItem.price || 500,
+            sellerName: rawItem.sellerName || rawItem.seller_name || "the seller",
+            condition: rawItem.condition || "good",
+            category: rawItem.category || "General",
+            description: rawItem.description || "No details available."
+        } : fallbackItem;
         
         const input = userInput.toLowerCase();
         let reply = "";
@@ -6685,7 +6731,7 @@ const app = {
         }
 
         return reply;
-    } ,
+    },
 
     triggerSellerAutoReply(sellerEmail, userMessage) {
         const users = JSON.parse(localStorage.getItem('cl_users')) || [];
