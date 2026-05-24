@@ -1,18 +1,56 @@
 /**
  * CampusLink - Main Application & Backend Controller
  * Simulates a robust university database using localStorage & sessionStorage.
+ * Also supports real-time synchronization via Supabase Auth & PostgreSQL.
  */
+
+/**
+ * Supabase Configuration Block
+ * To enable the real-time online cloud database, plug in your free Supabase credentials below!
+ * If left empty, the application will seamlessly fall back to local localStorage database mode.
+ */
+const supabaseConfig = {
+    url: "YOUR_SUPABASE_URL",
+    anonKey: "YOUR_SUPABASE_ANON_KEY"
+};
+
+// Initialize Supabase dynamically if keys are configured
+let supabaseClient = null;
+
+if (typeof supabase !== 'undefined' && supabaseConfig.url !== "YOUR_SUPABASE_URL") {
+    try {
+        supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
+        console.log("CampusLink: Live Supabase Connected successfully!");
+    } catch (err) {
+        console.error("CampusLink: Supabase initialization failed:", err);
+    }
+} else {
+    console.log("CampusLink: Running in Local Storage database mode (No Supabase keys found).");
+}
 
 const app = {
     // Active navigation state
     currentView: 'home',
     currentUser: null,
+    currentUserWishlist: [],
+    currentListingsCache: [],
+    currentTeamsCache: [],
+    currentRedditPostsCache: [],
     activeChatEmail: null,
+    activeChatChannel: null,
     activeProfileTab: 'listings',
     
     // Reddit states
     activeSubreddit: 'all',
     activeRedditSort: 'hot',
+
+    isSupabaseEnabled() {
+        return supabaseClient !== null;
+    },
+
+    isFirebaseEnabled() {
+        return this.isSupabaseEnabled();
+    },
 
     // Core Init
     init() {
@@ -25,7 +63,84 @@ const app = {
         this.setupEventListeners();
         
         // Check Session Gate
-        this.checkAuthSession();
+        if (this.isSupabaseEnabled()) {
+            // Check current session
+            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+                if (session) {
+                    this.handleSupabaseUserSession(session.user);
+                } else {
+                    this.renderAnonymousUI();
+                }
+            });
+
+            // Listen to auth changes
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session) {
+                    this.handleSupabaseUserSession(session.user);
+                } else {
+                    this.renderAnonymousUI();
+                }
+            });
+        } else {
+            this.checkAuthSession();
+        }
+    },
+
+    handleSupabaseUserSession(authUser) {
+        supabaseClient
+            .from('users')
+            .select('*')
+            .eq('email', authUser.email)
+            .single()
+            .then(({ data, error }) => {
+                if (error || !data) {
+                    console.error("User profile document not found in Supabase:", error);
+                    this.logout();
+                } else {
+                    this.currentUser = {
+                        ...data,
+                        email: authUser.email // Enforce key
+                    };
+                    this.renderAuthenticatedUI();
+                }
+            });
+    },
+
+    renderAuthenticatedUI() {
+        // Show main layout & elements
+        document.getElementById('auth-page').style.display = 'none';
+        document.getElementById('main-navbar').style.display = 'block';
+        document.getElementById('app-content').style.display = 'block';
+        document.getElementById('main-footer').style.display = 'block';
+
+        // Configure chip tags (Initials SG, name split)
+        document.getElementById('user-chip-name').textContent = this.currentUser.name.split(' ')[0];
+        const nameParts = this.currentUser.name.split(' ');
+        const initials = nameParts.map(p => p[0]).join('').toUpperCase().substring(0, 2);
+        document.getElementById('user-chip-avatar').textContent = initials;
+
+        // Refresh dashboards
+        this.renderProducts();
+        this.renderTeams();
+        this.renderHackathons();
+        this.renderRedditPosts();
+        this.renderChatSidebar();
+        this.updateUnreadCountBadge();
+
+        // Navigate to last stored view or default home
+        this.navigate(this.currentView);
+    },
+
+    renderAnonymousUI() {
+        // Locking Dashboard
+        this.currentUser = null;
+        document.getElementById('auth-page').style.display = 'flex';
+        document.getElementById('main-navbar').style.display = 'none';
+        document.getElementById('app-content').style.display = 'none';
+        document.getElementById('main-footer').style.display = 'none';
+        
+        // Clear fields and toggle signin active tab
+        this.switchAuthTab('signin');
     },
 
     // 1. DATABASE SEEDING
@@ -340,39 +455,9 @@ const app = {
 
         if (storedUser) {
             this.currentUser = JSON.parse(storedUser);
-            
-            // Show main layout & elements
-            document.getElementById('auth-page').style.display = 'none';
-            document.getElementById('main-navbar').style.display = 'block';
-            document.getElementById('app-content').style.display = 'block';
-            document.getElementById('main-footer').style.display = 'block';
-
-            // Configure chip tags (Initials SG, name split)
-            document.getElementById('user-chip-name').textContent = this.currentUser.name.split(' ')[0];
-            const nameParts = this.currentUser.name.split(' ');
-            const initials = nameParts.map(p => p[0]).join('').toUpperCase().substring(0, 2);
-            document.getElementById('user-chip-avatar').textContent = initials;
-
-            // Refresh dashboards
-            this.renderProducts();
-            this.renderTeams();
-            this.renderHackathons();
-            this.renderRedditPosts();
-            this.renderChatSidebar();
-            this.updateUnreadCountBadge();
-
-            // Navigate to last stored view or default home
-            this.navigate(this.currentView);
+            this.renderAuthenticatedUI();
         } else {
-            // Locking Dashboard
-            this.currentUser = null;
-            document.getElementById('auth-page').style.display = 'flex';
-            document.getElementById('main-navbar').style.display = 'none';
-            document.getElementById('app-content').style.display = 'none';
-            document.getElementById('main-footer').style.display = 'none';
-            
-            // Clear fields and toggle signin active tab
-            this.switchAuthTab('signin');
+            this.renderAnonymousUI();
         }
     },
 
@@ -646,8 +731,28 @@ const app = {
         const grid = document.getElementById('products-grid');
         if (!grid) return;
 
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-        this.renderListingsToContainer(listings, grid);
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("wishlists").select("*").eq("email", this.currentUser.email).maybeSingle().then(({ data: wishlistDoc, error: wishErr }) => {
+                if (wishErr) throw wishErr;
+                this.currentUserWishlist = wishlistDoc ? (wishlistDoc.product_ids || []) : [];
+                return supabaseClient.from("listings").select("*").order("created_at", { ascending: false });
+            }).then(({ data: listingsData, error: listErr }) => {
+                if (listErr) throw listErr;
+                const listings = (listingsData || []).map(item => ({
+                    ...item,
+                    sellerName: item.seller_name,
+                    sellerEmail: item.seller_email
+                }));
+                this.currentListingsCache = listings;
+                this.renderListingsToContainer(listings, grid);
+            }).catch((err) => {
+                console.error("Failed to load cloud listings & wishlist:", err);
+                this.showToast("Failed to load cloud listings", "error");
+            });
+        } else {
+            const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+            this.renderListingsToContainer(listings, grid);
+        }
     },
 
     renderListingsToContainer(dataList, containerNode, isProfilePane = false) {
@@ -664,7 +769,9 @@ const app = {
             return;
         }
 
-        const wishlist = JSON.parse(localStorage.getItem(`cl_wishlist_${this.currentUser.email}`)) || [];
+        const wishlist = this.isSupabaseEnabled() ? 
+            (this.currentUserWishlist || []) : 
+            (JSON.parse(localStorage.getItem(`cl_wishlist_${this.currentUser.email}`)) || []);
 
         dataList.forEach(product => {
             const card = document.createElement('div');
@@ -733,7 +840,9 @@ const app = {
     },
 
     filterListings() {
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        const listings = this.isSupabaseEnabled() ? 
+            this.currentListingsCache : 
+            (JSON.parse(localStorage.getItem('cl_listings')) || []);
         const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
         
         // Category radio filter
@@ -764,7 +873,9 @@ const app = {
         });
 
         if (this.showWishlistOnly) {
-            const wishlist = JSON.parse(localStorage.getItem(`cl_wishlist_${this.currentUser.email}`)) || [];
+            const wishlist = this.isSupabaseEnabled() ? 
+                (this.currentUserWishlist || []) : 
+                (JSON.parse(localStorage.getItem(`cl_wishlist_${this.currentUser.email}`)) || []);
             filtered = filtered.filter(item => wishlist.includes(item.id));
         }
 
@@ -787,46 +898,80 @@ const app = {
 
     toggleWishlist(productId, event) {
         event.stopPropagation();
-        const key = `cl_wishlist_${this.currentUser.email}`;
-        let wishlist = JSON.parse(localStorage.getItem(key)) || [];
         
-        const idx = wishlist.indexOf(productId);
-        if (idx > -1) {
-            wishlist.splice(idx, 1);
-            this.showToast("Removed from wishlist", "info");
+        const rerenderWishlist = () => {
+            if (this.currentView === 'browse') {
+                this.filterListings();
+            } else if (this.currentView === 'profile') {
+                this.renderProfile();
+            }
+        };
+
+        if (this.isSupabaseEnabled()) {
+            const idx = this.currentUserWishlist.indexOf(productId);
+            if (idx > -1) {
+                this.currentUserWishlist.splice(idx, 1);
+                this.showToast("Removed from wishlist", "info");
+            } else {
+                this.currentUserWishlist.push(productId);
+                this.showToast("Added to wishlist", "success");
+            }
+            supabaseClient.from("wishlists").upsert({
+                email: this.currentUser.email,
+                product_ids: this.currentUserWishlist
+            }).then(({ error }) => {
+                if (error) throw error;
+                rerenderWishlist();
+            }).catch((err) => {
+                console.error("Failed to update cloud wishlist:", err);
+            });
         } else {
-            wishlist.push(productId);
-            this.showToast("Added to wishlist", "success");
-        }
-        localStorage.setItem(key, JSON.stringify(wishlist));
-        
-        // Re-render
-        if (this.currentView === 'browse') {
-            this.filterListings();
-        } else if (this.currentView === 'profile') {
-            this.renderProfile();
+            const key = `cl_wishlist_${this.currentUser.email}`;
+            let wishlist = JSON.parse(localStorage.getItem(key)) || [];
+            
+            const idx = wishlist.indexOf(productId);
+            if (idx > -1) {
+                wishlist.splice(idx, 1);
+                this.showToast("Removed from wishlist", "info");
+            } else {
+                wishlist.push(productId);
+                this.showToast("Added to wishlist", "success");
+            }
+            localStorage.setItem(key, JSON.stringify(wishlist));
+            rerenderWishlist();
         }
     },
 
     deleteListing(productId) {
         if (confirm("Are you sure you want to delete this listing?")) {
-            let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-            listings = listings.filter(item => item.id !== productId);
-            localStorage.setItem('cl_listings', JSON.stringify(listings));
-            
-            this.showToast("Item deleted successfully", "success");
-            
-            // Recompute Karma & Profile Grid
-            if (this.currentView === 'browse') {
-                this.renderProducts();
-            } else if (this.currentView === 'profile') {
-                this.renderProfile();
+            const refreshUI = () => {
+                this.showToast("Item deleted successfully", "success");
+                if (this.currentView === 'browse') {
+                    this.renderProducts();
+                } else if (this.currentView === 'profile') {
+                    this.renderProfile();
+                }
+            };
+
+            if (this.isSupabaseEnabled()) {
+                supabaseClient.from("listings").delete().eq("id", productId).then(({ error }) => {
+                    if (error) throw error;
+                    refreshUI();
+                }).catch((err) => {
+                    console.error("Failed to delete listing in Supabase:", err);
+                    this.showToast("Failed to delete cloud listing", "error");
+                });
+            } else {
+                let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+                listings = listings.filter(item => item.id !== productId);
+                localStorage.setItem('cl_listings', JSON.stringify(listings));
+                refreshUI();
             }
         }
     },
 
     openEditListing(productId) {
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        const listings = this.isSupabaseEnabled() ? this.currentListingsCache : (JSON.parse(localStorage.getItem('cl_listings')) || []);
         const item = listings.find(i => i.id === productId);
         if (!item) return;
 
@@ -845,7 +990,7 @@ const app = {
     },
 
     buyContactItem(productId) {
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        const listings = this.isSupabaseEnabled() ? this.currentListingsCache : (JSON.parse(localStorage.getItem('cl_listings')) || []);
         const product = listings.find(p => p.id === productId);
         if (!product) return;
 
@@ -857,41 +1002,66 @@ const app = {
             return;
         }
 
-        // Init message thread in user inbox
-        const buyerInboxKey = `cl_messages_${this.currentUser.email}`;
-        const sellerInboxKey = `cl_messages_${sellerEmail}`;
+        if (this.isSupabaseEnabled()) {
+            const roomId = this.getChatRoomId(this.currentUser.email, sellerEmail);
+            supabaseClient.from("chats").select("*").eq("room_id", roomId).maybeSingle().then(({ data: chatDoc, error }) => {
+                if (error) throw error;
+                if (!chatDoc || !chatDoc.messages || chatDoc.messages.length === 0) {
+                    const introMsg = {
+                        sender: this.currentUser.email,
+                        text: `Hi! I am interested in your item: "${product.title}" (listed for ₹${product.price}). Is it still available?`,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        unread: true
+                    };
+                    return supabaseClient.from("chats").upsert({
+                        room_id: roomId,
+                        user_a: this.currentUser.email,
+                        user_b: sellerEmail,
+                        messages: [introMsg]
+                    });
+                }
+            }).then(() => {
+                this.showToast("Message sent to seller! Redirecting to chat...", "success");
+                this.activeChatEmail = sellerEmail;
+                setTimeout(() => {
+                    this.navigate('chat');
+                }, 500);
+            }).catch((err) => {
+                console.error("Failed to contact seller in Supabase:", err);
+                this.showToast("Failed to connect with seller", "error");
+            });
+        } else {
+            const buyerInboxKey = `cl_messages_${this.currentUser.email}`;
+            const sellerInboxKey = `cl_messages_${sellerEmail}`;
 
-        let buyerInbox = JSON.parse(localStorage.getItem(buyerInboxKey)) || {};
-        let sellerInbox = JSON.parse(localStorage.getItem(sellerInboxKey)) || {};
+            let buyerInbox = JSON.parse(localStorage.getItem(buyerInboxKey)) || {};
+            let sellerInbox = JSON.parse(localStorage.getItem(sellerInboxKey)) || {};
 
-        if (!buyerInbox[sellerEmail]) buyerInbox[sellerEmail] = [];
-        if (!sellerInbox[this.currentUser.email]) sellerInbox[this.currentUser.email] = [];
+            if (!buyerInbox[sellerEmail]) buyerInbox[sellerEmail] = [];
+            if (!sellerInbox[this.currentUser.email]) sellerInbox[this.currentUser.email] = [];
 
-        // Check if there are messages. If empty, push introduction
-        if (buyerInbox[sellerEmail].length === 0) {
-            const introMsg = {
-                sender: this.currentUser.email,
-                text: `Hi! I am interested in your item: "${product.title}" (listed for ₹${product.price}). Is it still available?`,
-                timestamp: "Just now",
-                unread: true
-            };
-            buyerInbox[sellerEmail].push(introMsg);
-            
-            // Clone for seller inbox
-            const sellerIntroMsg = { ...introMsg, unread: true };
-            sellerInbox[this.currentUser.email].push(sellerIntroMsg);
+            if (buyerInbox[sellerEmail].length === 0) {
+                const introMsg = {
+                    sender: this.currentUser.email,
+                    text: `Hi! I am interested in your item: "${product.title}" (listed for ₹${product.price}). Is it still available?`,
+                    timestamp: "Just now",
+                    unread: true
+                };
+                buyerInbox[sellerEmail].push(introMsg);
+                
+                const sellerIntroMsg = { ...introMsg, unread: true };
+                sellerInbox[this.currentUser.email].push(sellerIntroMsg);
 
-            localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
-            localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
+                localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
+                localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
+            }
+
+            this.showToast("Message sent to seller! Redirecting to chat...", "success");
+            this.activeChatEmail = sellerEmail;
+            setTimeout(() => {
+                this.navigate('chat');
+            }, 500);
         }
-
-        this.showToast("Message sent to seller! Redirecting to chat...", "success");
-        
-        // Navigate to Chat thread
-        this.activeChatEmail = sellerEmail;
-        setTimeout(() => {
-            this.navigate('chat');
-        }, 500);
     },
 
     // 6. COLLABBOARD (TEAMS)
@@ -899,91 +1069,113 @@ const app = {
         const grid = document.getElementById('collab-teams-grid');
         if (!grid) return;
 
-        const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
-        
-        // Compute unique skills chips dynamically
-        this.renderSkillFilterChips(teams);
+        const renderTeamsData = (teams) => {
+            // Compute unique skills chips dynamically
+            this.renderSkillFilterChips(teams);
 
-        // Filter based on active skill filter chip
-        const activeChip = document.querySelector('.skill-chip.active');
-        const filterSkill = activeChip ? activeChip.getAttribute('data-skill') : 'all';
+            // Filter based on active skill filter chip
+            const activeChip = document.querySelector('.skill-chip.active');
+            const filterSkill = activeChip ? activeChip.getAttribute('data-skill') : 'all';
 
-        let dataToRender = teams;
-        if (filterSkill !== 'all') {
-            dataToRender = teams.filter(t => {
-                const skillsArr = t.skills.split(',').map(s => s.trim().toLowerCase());
-                return skillsArr.includes(filterSkill.toLowerCase());
-            });
-        }
-
-        grid.innerHTML = '';
-        if (dataToRender.length === 0) {
-            grid.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
-                    <i data-lucide="users" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
-                    <h3>No teams found</h3>
-                    <p>Create a project team and recruit engineering colleagues!</p>
-                </div>
-            `;
-            if (window.lucide) lucide.createIcons();
-            return;
-        }
-
-        dataToRender.forEach(team => {
-            const card = document.createElement('div');
-            card.className = 'feature-card glass-panel team-card';
-            
-            // Skill tags
-            const skillsArr = team.skills.split(',').map(s => s.trim());
-            let skillsBadges = skillsArr.map(s => `<span class="tag-badge skill">${s}</span>`).join('');
-
-            // Open Roles tags
-            const rolesArr = team.openRoles.split(',').map(r => r.trim());
-            let rolesBadges = rolesArr.map(r => `<span class="tag-badge role">${r}</span>`).join('');
-
-            const isOwner = team.createdByEmail === this.currentUser.email;
-            const appliedList = team.applicants || [];
-            const hasApplied = appliedList.some(app => app.email === this.currentUser.email);
-
-            let actionBtn = '';
-            if (isOwner) {
-                const count = appliedList.length;
-                const badgeStr = count > 0 ? ` <span class="badge-count" style="margin-left:5px;">${count}</span>` : '';
-                actionBtn = `<button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; margin-top: auto;">Manage${badgeStr}</button>`;
-            } else if (hasApplied) {
-                actionBtn = `<button class="btn btn-secondary" style="width:100%; margin-top: auto;" disabled>Application Sent</button>`;
-            } else {
-                actionBtn = `<button class="btn btn-primary" onclick="app.applyToTeam(${team.id})" style="width:100%; margin-top: auto;">Apply / Join</button>`;
+            let dataToRender = teams;
+            if (filterSkill !== 'all') {
+                dataToRender = teams.filter(t => {
+                    const skillsArr = t.skills.split(',').map(s => s.trim().toLowerCase());
+                    return skillsArr.includes(filterSkill.toLowerCase());
+                });
             }
 
-            card.innerHTML = `
-                <div style="text-align: left; height: 100%; display: flex; flex-direction: column;">
-                    <div class="team-card-header">
-                        <h3 style="margin-bottom:0; text-align: left;">${team.teamName}</h3>
+            grid.innerHTML = '';
+            if (dataToRender.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
+                        <i data-lucide="users" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
+                        <h3>No teams found</h3>
+                        <p>Create a project team and recruit engineering colleagues!</p>
                     </div>
-                    <div class="team-creator">
-                        <i data-lucide="user" style="width:12px; height:12px;"></i>
-                        <span>Created by: ${team.createdBy}</span>
-                    </div>
-                    <p style="color: var(--text-muted); font-size:0.9rem; margin-top: 1rem; margin-bottom: 1rem; line-height:1.5;">${team.description}</p>
-                    
-                    <div style="margin-top:auto;">
-                        <div style="font-weight:600; font-size:0.85rem; color:var(--text-main);">Required Skills:</div>
-                        <div class="tag-list">${skillsBadges}</div>
-                        
-                        <div style="font-weight:600; font-size:0.85rem; color:var(--text-main); margin-top: 0.5rem;">Open Roles:</div>
-                        <div class="tag-list">${rolesBadges}</div>
-                    </div>
-                    
-                    <div style="margin-top: 1.5rem;">
-                        ${actionBtn}
-                    </div>
-                </div>
-            `;
-            grid.appendChild(card);
-        });
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
 
-        if (window.lucide) lucide.createIcons();
+            dataToRender.forEach(team => {
+                const card = document.createElement('div');
+                card.className = 'feature-card glass-panel team-card';
+                
+                // Skill tags
+                const skillsArr = team.skills.split(',').map(s => s.trim());
+                let skillsBadges = skillsArr.map(s => `<span class="tag-badge skill">${s}</span>`).join('');
+
+                // Open Roles tags
+                const rolesArr = team.openRoles.split(',').map(r => r.trim());
+                let rolesBadges = rolesArr.map(r => `<span class="tag-badge role">${r}</span>`).join('');
+
+                const isOwner = team.createdByEmail === this.currentUser.email;
+                const appliedList = team.applicants || [];
+                const hasApplied = appliedList.some(app => app.email === this.currentUser.email);
+
+                let actionBtn = '';
+                if (isOwner) {
+                    const count = appliedList.length;
+                    const badgeStr = count > 0 ? ` <span class="badge-count" style="margin-left:5px;">${count}</span>` : '';
+                    actionBtn = `<button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; margin-top: auto;">Manage${badgeStr}</button>`;
+                } else if (hasApplied) {
+                    actionBtn = `<button class="btn btn-secondary" style="width:100%; margin-top: auto;" disabled>Application Sent</button>`;
+                } else {
+                    actionBtn = `<button class="btn btn-primary" onclick="app.applyToTeam(${team.id})" style="width:100%; margin-top: auto;">Apply / Join</button>`;
+                }
+
+                card.innerHTML = `
+                    <div style="text-align: left; height: 100%; display: flex; flex-direction: column;">
+                        <div class="team-card-header">
+                            <h3 style="margin-bottom:0; text-align: left;">${team.teamName}</h3>
+                        </div>
+                        <div class="team-creator">
+                            <i data-lucide="user" style="width:12px; height:12px;"></i>
+                            <span>Created by: ${team.createdBy}</span>
+                        </div>
+                        <p style="color: var(--text-muted); font-size:0.9rem; margin-top: 1rem; margin-bottom: 1rem; line-height:1.5;">${team.description}</p>
+                        
+                        <div style="margin-top:auto;">
+                            <div style="font-weight:600; font-size:0.85rem; color:var(--text-main);">Required Skills:</div>
+                            <div class="tag-list">${skillsBadges}</div>
+                            
+                            <div style="font-weight:600; font-size:0.85rem; color:var(--text-main); margin-top: 0.5rem;">Open Roles:</div>
+                            <div class="tag-list">${rolesBadges}</div>
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            ${actionBtn}
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("teams").select("*").then(({ data: teamsData, error }) => {
+                if (error) throw error;
+                const teams = (teamsData || []).map(t => ({
+                    ...t,
+                    teamName: t.team_name,
+                    openRoles: t.open_roles,
+                    createdBy: t.created_by,
+                    createdByEmail: t.created_by_email
+                }));
+                this.currentTeamsCache = teams;
+                renderTeamsData(teams);
+            }).catch((err) => {
+                console.error("Failed to load cloud teams:", err);
+                this.showToast("Failed to load cloud teams", "error");
+            });
+        } else {
+            const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+            this.currentTeamsCache = teams;
+            renderTeamsData(teams);
+        }
     },
 
     renderSkillFilterChips(teams) {
@@ -997,7 +1189,7 @@ const app = {
         // Extract all unique skills
         let allSkills = new Set();
         teams.forEach(t => {
-            t.skills.split(',').forEach(s => {
+            (t.skills || '').split(',').forEach(s => {
                 const skill = s.trim();
                 if (skill !== '') allSkills.add(skill);
             });
@@ -1030,7 +1222,7 @@ const app = {
     },
 
     applyToTeam(teamId) {
-        const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+        const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
         const team = teams.find(t => t.id === teamId);
         if (!team) return;
 
@@ -1048,21 +1240,37 @@ const app = {
             return;
         }
 
-        team.applicants.push({
+        const newApplicant = {
             name: this.currentUser.name,
             email: this.currentUser.email,
             branch: this.currentUser.branch,
             semester: this.currentUser.semester,
             phone: this.currentUser.phone
-        });
+        };
 
-        localStorage.setItem('cl_teams', JSON.stringify(teams));
-        this.showToast("Application sent to team leader!", "success");
-        this.renderTeams();
+        const updatedApplicants = [...team.applicants, newApplicant];
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("teams").update({
+                applicants: updatedApplicants
+            }).eq("id", teamId).then(({ error }) => {
+                if (error) throw error;
+                this.showToast("Application sent to team leader!", "success");
+                this.renderTeams();
+            }).catch((err) => {
+                console.error("Failed to apply to team in Supabase:", err);
+                this.showToast("Failed to apply to team", "error");
+            });
+        } else {
+            team.applicants.push(newApplicant);
+            localStorage.setItem('cl_teams', JSON.stringify(teams));
+            this.showToast("Application sent to team leader!", "success");
+            this.renderTeams();
+        }
     },
 
     openManageApplicants(teamId) {
-        const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+        const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
         const team = teams.find(t => t.id === teamId);
         if (!team) return;
 
@@ -1109,90 +1317,109 @@ const app = {
         if (!grid) return;
 
         const hackathons = JSON.parse(localStorage.getItem('cl_hackathons')) || [];
-        const registrations = JSON.parse(localStorage.getItem('cl_hackathon_registrations')) || [];
 
-        // Update statistics
-        document.getElementById('hack-stat-count').textContent = hackathons.filter(h => h.status !== 'ended').length;
-        document.getElementById('hack-stat-registrations').textContent = registrations.length;
-        
-        let prizeSum = 0;
-        hackathons.forEach(h => {
-            const numericVal = parseInt(h.prizePool.replace(/[^0-9]/g, '')) || 0;
-            prizeSum += numericVal;
-        });
-        document.getElementById('hack-stat-prizes').textContent = `₹${(prizeSum / 100000).toFixed(1)} Lakhs`;
+        const renderHackathonsData = (registrations) => {
+            // Update statistics
+            document.getElementById('hack-stat-count').textContent = hackathons.filter(h => h.status !== 'ended').length;
+            document.getElementById('hack-stat-registrations').textContent = registrations.length;
+            
+            let prizeSum = 0;
+            hackathons.forEach(h => {
+                const numericVal = parseInt((h.prizePool || '').replace(/[^0-9]/g, '')) || 0;
+                prizeSum += numericVal;
+            });
+            document.getElementById('hack-stat-prizes').textContent = `₹${(prizeSum / 100000).toFixed(1)} Lakhs`;
 
-        grid.innerHTML = '';
-        hackathons.forEach(hack => {
-            const card = document.createElement('div');
-            card.className = 'hackathon-card glass-panel';
+            grid.innerHTML = '';
+            hackathons.forEach(hack => {
+                const card = document.createElement('div');
+                card.className = 'hackathon-card glass-panel';
 
-            let tagText = 'Registering';
-            let tagClass = 'registering';
-            if (hack.status === 'upcoming') {
-                tagText = 'Upcoming';
-                tagClass = 'upcoming';
-            } else if (hack.status === 'ended') {
-                tagText = 'Ended';
-                tagClass = 'ended';
-            }
+                let tagText = 'Registering';
+                let tagClass = 'registering';
+                if (hack.status === 'upcoming') {
+                    tagText = 'Upcoming';
+                    tagClass = 'upcoming';
+                } else if (hack.status === 'ended') {
+                    tagText = 'Ended';
+                    tagClass = 'ended';
+                }
 
-            const regCount = registrations.filter(r => r.hackathonId === hack.id).length;
-            const hasRegistered = registrations.some(r => r.hackathonId === hack.id && r.userEmail === this.currentUser.email);
+                const regCount = registrations.filter(r => r.hackathonId === hack.id).length;
+                const hasRegistered = registrations.some(r => r.hackathonId === hack.id && r.userEmail === this.currentUser.email);
 
-            let actionBtn = '';
-            if (hack.status === 'ended') {
-                actionBtn = `<button class="btn btn-secondary" style="width: 100%;" disabled>Ended</button>`;
-            } else if (hasRegistered) {
-                actionBtn = `<button class="btn btn-secondary" style="width: 100%; border-color: #34d399; color: #34d399;" disabled><i data-lucide="check-circle" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Registered</button>`;
-            } else {
-                actionBtn = `<button class="btn btn-primary" onclick="app.openRegisterHackathon(${hack.id})" style="width: 100%;">Register Team</button>`;
-            }
+                let actionBtn = '';
+                if (hack.status === 'ended') {
+                    actionBtn = `<button class="btn btn-secondary" style="width: 100%;" disabled>Ended</button>`;
+                } else if (hasRegistered) {
+                    actionBtn = `<button class="btn btn-secondary" style="width: 100%; border-color: #34d399; color: #34d399;" disabled><i data-lucide="check-circle" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Registered</button>`;
+                } else {
+                    actionBtn = `<button class="btn btn-primary" onclick="app.openRegisterHackathon(${hack.id})" style="width: 100%;">Register Team</button>`;
+                }
 
-            // Timeline HTML
-            let timelineHtml = '';
-            if (hack.timeline) {
-                timelineHtml = hack.timeline.map(step => `
-                    <div class="timeline-step ${step.active ? 'active' : ''}">
-                        <div class="timeline-title">${step.title}</div>
-                        <div class="timeline-date">${step.date}</div>
+                // Timeline HTML
+                let timelineHtml = '';
+                if (hack.timeline) {
+                    timelineHtml = hack.timeline.map(step => `
+                        <div class="timeline-step ${step.active ? 'active' : ''}">
+                            <div class="timeline-title">${step.title}</div>
+                            <div class="timeline-date">${step.date}</div>
+                        </div>
+                    `).join('');
+                }
+
+                card.innerHTML = `
+                    <div class="hackathon-banner" style="background-image: url('${hack.bannerImage}')">
+                        <div class="hackathon-banner-overlay"></div>
+                        <span class="hackathon-tag ${tagClass}">${tagText}</span>
                     </div>
-                `).join('');
-            }
+                    <div class="hackathon-body">
+                        <div class="hackathon-organizer">${hack.organizer}</div>
+                        <h3 style="margin-bottom:0.5rem; text-align:left;">${hack.title}</h3>
+                        <p class="text-sm text-muted" style="line-height:1.5; margin-bottom:1rem;">${hack.details}</p>
+                        
+                        <div class="hackathon-prize-badge">
+                            <i data-lucide="trophy" style="width: 16px; height: 16px;"></i> Pool: ${hack.prizePool}
+                        </div>
 
-            card.innerHTML = `
-                <div class="hackathon-banner" style="background-image: url('${hack.bannerImage}')">
-                    <div class="hackathon-banner-overlay"></div>
-                    <span class="hackathon-tag ${tagClass}">${tagText}</span>
-                </div>
-                <div class="hackathon-body">
-                    <div class="hackathon-organizer">${hack.organizer}</div>
-                    <h3 style="margin-bottom:0.5rem; text-align:left;">${hack.title}</h3>
-                    <p class="text-sm text-muted" style="line-height:1.5; margin-bottom:1rem;">${hack.details}</p>
-                    
-                    <div class="hackathon-prize-badge">
-                        <i data-lucide="trophy" style="width: 16px; height: 16px;"></i> Pool: ${hack.prizePool}
+                        <div style="font-weight:700; font-size:0.85rem; color:var(--text-main); margin-top: 1.5rem;">Schedules & Deadlines:</div>
+                        <div class="hackathon-timeline">
+                            ${timelineHtml}
+                        </div>
+
+                        <div class="hackathon-info-row" style="margin-top:auto;">
+                            <span class="hackathon-info-item"><i data-lucide="users" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ${regCount + hack.activeRegistrations} Teams Joined</span>
+                            <span class="hackathon-info-item"><i data-lucide="calendar" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ${hack.dates}</span>
+                        </div>
+
+                        <div style="margin-top: 1.5rem;">
+                            ${actionBtn}
+                        </div>
                     </div>
+                `;
+                grid.appendChild(card);
+            });
 
-                    <div style="font-weight:700; font-size:0.85rem; color:var(--text-main); margin-top: 1.5rem;">Schedules & Deadlines:</div>
-                    <div class="hackathon-timeline">
-                        ${timelineHtml}
-                    </div>
+            if (window.lucide) lucide.createIcons();
+        };
 
-                    <div class="hackathon-info-row" style="margin-top:auto;">
-                        <span class="hackathon-info-item"><i data-lucide="users" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ${regCount + hack.activeRegistrations} Teams Joined</span>
-                        <span class="hackathon-info-item"><i data-lucide="calendar" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ${hack.dates}</span>
-                    </div>
-
-                    <div style="margin-top: 1.5rem;">
-                        ${actionBtn}
-                    </div>
-                </div>
-            `;
-            grid.appendChild(card);
-        });
-
-        if (window.lucide) lucide.createIcons();
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("hackathon_registrations").select("*").then(({ data: regsData, error }) => {
+                if (error) throw error;
+                const regs = (regsData || []).map(r => ({
+                    ...r,
+                    hackathonId: r.hackathon_id,
+                    userEmail: r.user_email
+                }));
+                renderHackathonsData(regs);
+            }).catch((err) => {
+                console.error("Failed to load cloud hackathon registrations:", err);
+                this.showToast("Failed to load cloud hackathon registrations", "error");
+            });
+        } else {
+            const registrations = JSON.parse(localStorage.getItem('cl_hackathon_registrations')) || [];
+            renderHackathonsData(registrations);
+        }
     },
 
     openRegisterHackathon(hackId) {
@@ -1215,13 +1442,17 @@ const app = {
         const feed = document.getElementById('reddit-posts-feed');
         if (!feed) return;
 
-        const posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-
         // Upgrades sidebar active classes
         document.querySelectorAll('.subreddit-item').forEach(el => {
             el.classList.remove('active');
-            const sub = el.getAttribute('onclick').match(/'([^']+)'/)[1];
-            if (sub === this.activeSubreddit) el.classList.add('active');
+            const onclickAttr = el.getAttribute('onclick');
+            if (onclickAttr) {
+                const match = onclickAttr.match(/'([^']+)'/);
+                if (match) {
+                    const sub = match[1];
+                    if (sub === this.activeSubreddit) el.classList.add('active');
+                }
+            }
         });
 
         // Filter subreddit & search
@@ -1232,124 +1463,146 @@ const app = {
             searchInput.placeholder = this.activeSubreddit === 'all' ? "Search threads in r/all..." : `Search threads in r/${this.activeSubreddit}...`;
         }
 
-        let filtered = posts.filter(post => {
-            const matchesSub = (this.activeSubreddit === 'all') || (post.subreddit === this.activeSubreddit);
-            const matchesSearch = post.title.toLowerCase().includes(searchVal) ||
-                                  post.body.toLowerCase().includes(searchVal) ||
-                                  post.flair.toLowerCase().includes(searchVal);
-            return matchesSub && matchesSearch;
-        });
-
-        // Sorting Logic
-        if (this.activeRedditSort === 'new') {
-            filtered.sort((a, b) => b.id - a.id);
-        } else if (this.activeRedditSort === 'top') {
-            filtered.sort((a, b) => {
-                const scoreA = (a.upvotes || []).length - (a.downvotes || []).length;
-                const scoreB = (b.upvotes || []).length - (b.downvotes || []).length;
-                return scoreB - scoreA;
+        const processRedditData = (posts) => {
+            let filtered = posts.filter(post => {
+                const matchesSub = (this.activeSubreddit === 'all') || (post.subreddit === this.activeSubreddit);
+                const matchesSearch = post.title.toLowerCase().includes(searchVal) ||
+                                      post.body.toLowerCase().includes(searchVal) ||
+                                      post.flair.toLowerCase().includes(searchVal);
+                return matchesSub && matchesSearch;
             });
-        } else {
-            // Hot formula: (Upvotes - Downvotes) + CommentsCount * 3
-            filtered.sort((a, b) => {
-                const hotA = ((a.upvotes || []).length - (a.downvotes || []).length) + (a.commentsCount || 0) * 3;
-                const hotB = ((b.upvotes || []).length - (b.downvotes || []).length) + (b.commentsCount || 0) * 3;
-                return hotB - hotA;
-            });
-        }
 
-        feed.innerHTML = '';
-        if (filtered.length === 0) {
-            feed.innerHTML = `
-                <div style="text-align: center; padding: 4rem; color: var(--text-muted);" class="glass-panel">
-                    <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
-                    <h3>No posts inside r/${this.activeSubreddit}</h3>
-                    <p>Be the first to publish a discussion thread here!</p>
-                </div>
-            `;
-            if (window.lucide) lucide.createIcons();
-            return;
-        }
-
-        filtered.forEach(post => {
-            const card = document.createElement('div');
-            card.className = 'product-card glass-panel reddit-post-card';
-
-            const userUpvoted = (post.upvotes || []).includes(this.currentUser.email);
-            const userDownvoted = (post.downvotes || []).includes(this.currentUser.email);
-            const score = (post.upvotes || []).length - (post.downvotes || []).length;
-
-            const upClass = userUpvoted ? 'active' : '';
-            const downClass = userDownvoted ? 'active' : '';
-
-            // Author metadata badges
-            let authorBadge = '';
-            if (post.authorEmail === 'neha@vvce.ac.in') {
-                authorBadge = `<span class="reddit-author-badge moderator"><i data-lucide="shield" style="width:10px; height:10px;"></i> Mod</span>`;
-            } else if (post.authorEmail === this.currentUser.email) {
-                authorBadge = `<span class="reddit-author-badge"><i data-lucide="user" style="width:10px; height:10px;"></i> Me</span>`;
+            // Sorting Logic
+            if (this.activeRedditSort === 'new') {
+                filtered.sort((a, b) => b.id - a.id);
+            } else if (this.activeRedditSort === 'top') {
+                filtered.sort((a, b) => {
+                    const scoreA = (a.upvotes || []).length - (a.downvotes || []).length;
+                    const scoreB = (b.upvotes || []).length - (b.downvotes || []).length;
+                    return scoreB - scoreA;
+                });
+            } else {
+                // Hot formula: (Upvotes - Downvotes) + CommentsCount * 3
+                filtered.sort((a, b) => {
+                    const hotA = ((a.upvotes || []).length - (a.downvotes || []).length) + (a.commentsCount || 0) * 3;
+                    const hotB = ((b.upvotes || []).length - (b.downvotes || []).length) + (b.commentsCount || 0) * 3;
+                    return hotB - hotA;
+                });
             }
 
-            const isAuthor = post.authorEmail === this.currentUser.email;
-            const deleteBtn = isAuthor ? `
-                <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost(${post.id})">
-                    <i data-lucide="trash-2" style="width: 12px; height:12px;"></i> Delete
-                </button>
-            ` : '';
-
-            const commentsList = JSON.parse(localStorage.getItem(`cl_reddit_comments_${post.id}`)) || [];
-            const commentCount = commentsList.length;
-
-            card.innerHTML = `
-                <div class="reddit-upvote-panel">
-                    <button class="vote-arrow up ${upClass}" onclick="app.voteRedditPost(${post.id}, 1)">
-                        <i data-lucide="arrow-up" style="width: 20px; height: 20px;"></i>
-                    </button>
-                    <span class="vote-count" style="font-size:0.85rem;">${score}</span>
-                    <button class="vote-arrow down ${downClass}" onclick="app.voteRedditPost(${post.id}, -1)">
-                        <i data-lucide="arrow-down" style="width: 20px; height: 20px;"></i>
-                    </button>
-                </div>
-                <div class="reddit-post-main">
-                    <div class="reddit-post-byline">
-                        <span class="reddit-subreddit-name" onclick="app.selectSubreddit('${post.subreddit}', event)">r/${post.subreddit}</span>
-                        <span>• Posted by ${post.authorName}</span>
-                        ${authorBadge}
-                        <span>• ${post.timestamp}</span>
+            feed.innerHTML = '';
+            if (filtered.length === 0) {
+                feed.innerHTML = `
+                    <div style="text-align: center; padding: 4rem; color: var(--text-muted);" class="glass-panel">
+                        <i data-lucide="message-square" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i>
+                        <h3>No posts inside r/${this.activeSubreddit}</h3>
+                        <p>Be the first to publish a discussion thread here!</p>
                     </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
 
-                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom: 0.5rem;">
-                        <span class="flair ${post.flair.toLowerCase()}" style="font-size:0.65rem;">${post.flair}</span>
-                        <h3 class="reddit-post-title" style="margin-bottom:0; text-align:left;">${post.title}</h3>
-                    </div>
+            filtered.forEach(post => {
+                const card = document.createElement('div');
+                card.className = 'product-card glass-panel reddit-post-card';
 
-                    <p class="reddit-post-body">${post.body}</p>
+                const userUpvoted = (post.upvotes || []).includes(this.currentUser.email);
+                const userDownvoted = (post.downvotes || []).includes(this.currentUser.email);
+                const score = (post.upvotes || []).length - (post.downvotes || []).length;
 
-                    <div class="reddit-post-footer">
-                        <button class="reddit-action-btn" onclick="app.toggleRedditComments(${post.id})">
-                            <i data-lucide="message-square" style="width: 14px; height: 14px;"></i>
-                            <span>${commentCount} Comment${commentCount === 1 ? '' : 's'}</span>
+                const upClass = userUpvoted ? 'active' : '';
+                const downClass = userDownvoted ? 'active' : '';
+
+                // Author metadata badges
+                let authorBadge = '';
+                if (post.authorEmail === 'neha@vvce.ac.in') {
+                    authorBadge = `<span class="reddit-author-badge moderator"><i data-lucide="shield" style="width:10px; height:10px;"></i> Mod</span>`;
+                } else if (post.authorEmail === this.currentUser.email) {
+                    authorBadge = `<span class="reddit-author-badge"><i data-lucide="user" style="width:10px; height:10px;"></i> Me</span>`;
+                }
+
+                const isAuthor = post.authorEmail === this.currentUser.email;
+                const deleteBtn = isAuthor ? `
+                    <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost(${post.id})">
+                        <i data-lucide="trash-2" style="width: 12px; height:12px;"></i> Delete
+                    </button>
+                ` : '';
+
+                const commentCount = this.isSupabaseEnabled() ? (post.commentsCount || 0) : (JSON.parse(localStorage.getItem(`cl_reddit_comments_${post.id}`)) || []).length;
+
+                card.innerHTML = `
+                    <div class="reddit-upvote-panel">
+                        <button class="vote-arrow up ${upClass}" onclick="app.voteRedditPost(${post.id}, 1)">
+                            <i data-lucide="arrow-up" style="width: 20px; height: 20px;"></i>
                         </button>
-                        ${deleteBtn}
+                        <span class="vote-count" style="font-size:0.85rem;">${score}</span>
+                        <button class="vote-arrow down ${downClass}" onclick="app.voteRedditPost(${post.id}, -1)">
+                            <i data-lucide="arrow-down" style="width: 20px; height: 20px;"></i>
+                        </button>
                     </div>
+                    <div class="reddit-post-main">
+                        <div class="reddit-post-byline">
+                            <span class="reddit-subreddit-name" onclick="app.selectSubreddit('${post.subreddit}', event)">r/${post.subreddit}</span>
+                            <span>• Posted by ${post.authorName}</span>
+                            ${authorBadge}
+                            <span>• ${post.timestamp}</span>
+                        </div>
 
-                    <!-- Threaded comments drawer -->
-                    <div class="post-comments-drawer" id="reddit-comments-drawer-${post.id}">
-                        <form class="comment-input-area" onsubmit="app.submitRedditComment(${post.id}, event)" style="margin-top: 1rem;">
-                            <input type="text" id="reddit-comment-input-${post.id}" class="form-control" placeholder="Add a public reply..." required autocomplete="off">
-                            <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;"><i data-lucide="corner-down-left"></i></button>
-                        </form>
-                        <div class="comments-list" id="reddit-comments-list-${post.id}">
-                            <!-- Dynamic nested nodes -->
+                        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom: 0.5rem;">
+                            <span class="flair ${post.flair.toLowerCase()}" style="font-size:0.65rem;">${post.flair}</span>
+                            <h3 class="reddit-post-title" style="margin-bottom:0; text-align:left;">${post.title}</h3>
+                        </div>
+
+                        <p class="reddit-post-body">${post.body}</p>
+
+                        <div class="reddit-post-footer">
+                            <button class="reddit-action-btn" onclick="app.toggleRedditComments(${post.id})">
+                                <i data-lucide="message-square" style="width: 14px; height: 14px;"></i>
+                                <span>${commentCount} Comment${commentCount === 1 ? '' : 's'}</span>
+                            </button>
+                            ${deleteBtn}
+                        </div>
+
+                        <!-- Threaded comments drawer -->
+                        <div class="post-comments-drawer" id="reddit-comments-drawer-${post.id}">
+                            <form class="comment-input-area" onsubmit="app.submitRedditComment(${post.id}, event)" style="margin-top: 1rem;">
+                                <input type="text" id="reddit-comment-input-${post.id}" class="form-control" placeholder="Add a public reply..." required autocomplete="off">
+                                <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;"><i data-lucide="corner-down-left"></i></button>
+                            </form>
+                            <div class="comments-list" id="reddit-comments-list-${post.id}">
+                                <!-- Dynamic nested nodes -->
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-            feed.appendChild(card);
-            this.renderRedditCommentsList(post.id);
-        });
+                `;
+                feed.appendChild(card);
+                this.renderRedditCommentsList(post.id);
+            });
 
-        if (window.lucide) lucide.createIcons();
+            if (window.lucide) lucide.createIcons();
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("reddit_posts").select("*").then(({ data: postsData, error }) => {
+                if (error) throw error;
+                const posts = (postsData || []).map(p => ({
+                    ...p,
+                    authorName: p.author_name,
+                    authorEmail: p.author_email,
+                    commentsCount: p.comments_count
+                }));
+                this.currentRedditPostsCache = posts;
+                processRedditData(posts);
+            }).catch((err) => {
+                console.error("Failed to load cloud reddit posts:", err);
+                this.showToast("Failed to load cloud posts", "error");
+            });
+        } else {
+            const posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+            this.currentRedditPostsCache = posts;
+            processRedditData(posts);
+        }
     },
 
     selectSubreddit(subName, event) {
@@ -1372,36 +1625,71 @@ const app = {
     },
 
     voteRedditPost(postId, direction) {
-        let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-        const post = posts.find(p => p.id === postId);
-        if (!post) return;
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("reddit_posts").select("*").eq("id", postId).maybeSingle().then(({ data: post, error }) => {
+                if (error || !post) throw error || new Error("Post not found");
+                
+                let upvotes = post.upvotes || [];
+                let downvotes = post.downvotes || [];
+                const email = this.currentUser.email;
 
-        const email = this.currentUser.email;
-        if (!post.upvotes) post.upvotes = [];
-        if (!post.downvotes) post.downvotes = [];
+                if (direction === 1) {
+                    const idx = upvotes.indexOf(email);
+                    if (idx > -1) {
+                        upvotes = upvotes.filter(e => e !== email);
+                    } else {
+                        upvotes.push(email);
+                        downvotes = downvotes.filter(e => e !== email);
+                    }
+                } else {
+                    const idx = downvotes.indexOf(email);
+                    if (idx > -1) {
+                        downvotes = downvotes.filter(e => e !== email);
+                    } else {
+                        downvotes.push(email);
+                        upvotes = upvotes.filter(e => e !== email);
+                    }
+                }
 
-        if (direction === 1) {
-            const idx = post.upvotes.indexOf(email);
-            if (idx > -1) {
-                post.upvotes.splice(idx, 1);
-            } else {
-                post.upvotes.push(email);
-                const downIdx = post.downvotes.indexOf(email);
-                if (downIdx > -1) post.downvotes.splice(downIdx, 1);
-            }
+                return supabaseClient.from("reddit_posts").update({ upvotes, downvotes }).eq("id", postId);
+            }).then(({ error }) => {
+                if (error) throw error;
+                this.renderRedditPosts();
+            }).catch((err) => {
+                console.error("Failed to vote in Supabase:", err);
+            });
         } else {
-            const idx = post.downvotes.indexOf(email);
-            if (idx > -1) {
-                post.downvotes.splice(idx, 1);
-            } else {
-                post.downvotes.push(email);
-                const upIdx = post.upvotes.indexOf(email);
-                if (upIdx > -1) post.upvotes.splice(upIdx, 1);
-            }
-        }
+            let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
 
-        localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
-        this.renderRedditPosts();
+            const email = this.currentUser.email;
+            if (!post.upvotes) post.upvotes = [];
+            if (!post.downvotes) post.downvotes = [];
+
+            if (direction === 1) {
+                const idx = post.upvotes.indexOf(email);
+                if (idx > -1) {
+                    post.upvotes.splice(idx, 1);
+                } else {
+                    post.upvotes.push(email);
+                    const downIdx = post.downvotes.indexOf(email);
+                    if (downIdx > -1) post.downvotes.splice(downIdx, 1);
+                }
+            } else {
+                const idx = post.downvotes.indexOf(email);
+                if (idx > -1) {
+                    post.downvotes.splice(idx, 1);
+                } else {
+                    post.downvotes.push(email);
+                    const upIdx = post.upvotes.indexOf(email);
+                    if (upIdx > -1) post.upvotes.splice(upIdx, 1);
+                }
+            }
+
+            localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
+            this.renderRedditPosts();
+        }
     },
 
     toggleRedditComments(postId) {
@@ -1417,9 +1705,26 @@ const app = {
         const container = document.getElementById(`reddit-comments-list-${postId}`);
         if (!container) return;
 
-        const comments = JSON.parse(localStorage.getItem(`cl_reddit_comments_${postId}`)) || [];
-        container.innerHTML = '';
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("reddit_comments").select("*").eq("post_id", postId).order("created_at", { ascending: true }).then(({ data: commentsData, error }) => {
+                if (error) throw error;
+                const comments = (commentsData || []).map(c => ({
+                    ...c,
+                    authorName: c.author_name,
+                    authorEmail: c.author_email
+                }));
+                this.renderCommentsToContainer(comments, container);
+            }).catch((err) => {
+                console.error("Failed to load cloud comments:", err);
+            });
+        } else {
+            const comments = JSON.parse(localStorage.getItem(`cl_reddit_comments_${postId}`)) || [];
+            this.renderCommentsToContainer(comments, container);
+        }
+    },
 
+    renderCommentsToContainer(comments, container) {
+        container.innerHTML = '';
         if (comments.length === 0) {
             container.innerHTML = `<p class="text-sm text-muted italic" style="padding: 0.5rem 0;">No comments yet. Be the first to reply!</p>`;
             return;
@@ -1431,7 +1736,7 @@ const app = {
             node.innerHTML = `
                 <div class="comment-meta">
                     <span style="font-weight: 700; color:var(--text-main);">${comment.authorName}</span>
-                    <span>${comment.timestamp}</span>
+                    <span>${comment.timestamp || 'Just now'}</span>
                 </div>
                 <div class="comment-body" style="font-size:0.875rem;">${comment.body}</div>
             `;
@@ -1447,127 +1752,247 @@ const app = {
         const text = input.value.trim();
         if (text === '') return;
 
-        const commentsKey = `cl_reddit_comments_${postId}`;
-        let comments = JSON.parse(localStorage.getItem(commentsKey)) || [];
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("reddit_comments").insert({
+                post_id: postId,
+                author_name: this.currentUser.name,
+                author_email: this.currentUser.email,
+                body: text,
+                timestamp: "Just now"
+            }).then(({ error }) => {
+                if (error) throw error;
+                return supabaseClient.from("reddit_posts").select("comments_count").eq("id", postId).maybeSingle();
+            }).then(({ data: post, error }) => {
+                if (error) throw error;
+                const newCount = (post ? post.comments_count : 0) + 1;
+                return supabaseClient.from("reddit_posts").update({ comments_count: newCount }).eq("id", postId);
+            }).then(({ error }) => {
+                if (error) throw error;
+                input.value = '';
+                this.showToast("Comment published!", "success");
+                this.renderRedditCommentsList(postId);
+                this.renderRedditPosts();
+            }).catch((err) => {
+                console.error("Failed to submit cloud comment:", err);
+                this.showToast("Failed to submit comment", "error");
+            });
+        } else {
+            const commentsKey = `cl_reddit_comments_${postId}`;
+            let comments = JSON.parse(localStorage.getItem(commentsKey)) || [];
 
-        const newComment = {
-            id: comments.length + 1,
-            authorName: this.currentUser.name,
-            authorEmail: this.currentUser.email,
-            body: text,
-            timestamp: "Just now"
-        };
+            const newComment = {
+                id: comments.length + 1,
+                authorName: this.currentUser.name,
+                authorEmail: this.currentUser.email,
+                body: text,
+                timestamp: "Just now"
+            };
 
-        comments.push(newComment);
-        localStorage.setItem(commentsKey, JSON.stringify(comments));
+            comments.push(newComment);
+            localStorage.setItem(commentsKey, JSON.stringify(comments));
 
-        // Increment comments count in post
-        let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-        const idx = posts.findIndex(p => p.id === postId);
-        if (idx > -1) {
-            posts[idx].commentsCount = (posts[idx].commentsCount || 0) + 1;
-            localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
+            // Increment comments count in post
+            let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+            const idx = posts.findIndex(p => p.id === postId);
+            if (idx > -1) {
+                posts[idx].commentsCount = (posts[idx].commentsCount || 0) + 1;
+                localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
+            }
+
+            input.value = '';
+            this.showToast("Comment published!", "success");
+            
+            this.renderRedditCommentsList(postId);
+            this.renderRedditPosts();
         }
-
-        input.value = '';
-        this.showToast("Comment published!", "success");
-        
-        this.renderRedditCommentsList(postId);
-        this.renderRedditPosts();
     },
 
     deleteRedditPost(postId) {
         if (confirm("Are you sure you want to delete this community thread?")) {
-            let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-            posts = posts.filter(p => p.id !== postId);
-            localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
-            
-            localStorage.removeItem(`cl_reddit_comments_${postId}`);
-            this.showToast("Post deleted successfully", "success");
-            
-            if (this.currentView === 'reddit') {
-                this.renderRedditPosts();
-            } else if (this.currentView === 'profile') {
-                this.renderProfile();
+            const refreshUI = () => {
+                this.showToast("Post deleted successfully", "success");
+                if (this.currentView === 'reddit') {
+                    this.renderRedditPosts();
+                } else if (this.currentView === 'profile') {
+                    this.renderProfile();
+                }
+            };
+
+            if (this.isSupabaseEnabled()) {
+                supabaseClient.from("reddit_posts").delete().eq("id", postId).then(({ error }) => {
+                    if (error) throw error;
+                    return supabaseClient.from("reddit_comments").delete().eq("post_id", postId);
+                }).then(({ error }) => {
+                    if (error) throw error;
+                    refreshUI();
+                }).catch((err) => {
+                    console.error("Failed to delete post in Supabase:", err);
+                    this.showToast("Failed to delete cloud post", "error");
+                });
+            } else {
+                let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+                posts = posts.filter(p => p.id !== postId);
+                localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
+                
+                localStorage.removeItem(`cl_reddit_comments_${postId}`);
+                this.showToast("Post deleted successfully", "success");
+                
+                if (this.currentView === 'reddit') {
+                    this.renderRedditPosts();
+                } else if (this.currentView === 'profile') {
+                    this.renderProfile();
+                }
             }
         }
     },
 
-    // 9. PROFILE PAGE & KARMA CALCULATOR
     renderProfile() {
         // Personal info
         document.getElementById('profile-avatar-large').textContent = this.currentUser.name[0].toUpperCase();
         document.getElementById('profile-full-name').textContent = this.currentUser.name;
         document.getElementById('profile-branch-sem').textContent = `${this.currentUser.branch} | Semester ${this.currentUser.semester}`;
 
-        // Bio, Skills, Links from Profile Store
-        const profileKey = `cl_profile_${this.currentUser.email}`;
-        const profile = JSON.parse(localStorage.getItem(profileKey)) || { bio: "", skills: [], github: "", linkedin: "" };
+        const renderProfileWithData = (profile, myItems, myRedditPosts, myTeams) => {
+            // Render bio
+            const bioText = document.getElementById('profile-bio');
+            if (profile.bio && profile.bio.trim() !== '') {
+                bioText.textContent = profile.bio;
+                bioText.classList.remove('empty');
+            } else {
+                bioText.textContent = "No bio description added yet. Tell people about yourself, your interests, and what items you are looking for.";
+                bioText.classList.add('empty');
+            }
 
-        // Render bio
-        const bioText = document.getElementById('profile-bio');
-        if (profile.bio && profile.bio.trim() !== '') {
-            bioText.textContent = profile.bio;
-            bioText.classList.remove('empty');
-        } else {
-            bioText.textContent = "No bio description added yet. Tell people about yourself, your interests, and what items you are looking for.";
-            bioText.classList.add('empty');
-        }
+            // Render skills list
+            const skillsContainer = document.getElementById('profile-skills-list');
+            skillsContainer.innerHTML = '';
+            if (profile.skills && profile.skills.length > 0) {
+                profile.skills.forEach(skill => {
+                    const sBadge = document.createElement('span');
+                    sBadge.className = 'tag-badge skill';
+                    sBadge.textContent = skill;
+                    skillsContainer.appendChild(sBadge);
+                });
+            } else {
+                skillsContainer.innerHTML = `<span class="text-muted italic" id="profile-skills-placeholder">No skills listed yet.</span>`;
+            }
 
-        // Render skills list
-        const skillsContainer = document.getElementById('profile-skills-list');
-        skillsContainer.innerHTML = '';
-        if (profile.skills && profile.skills.length > 0) {
-            profile.skills.forEach(skill => {
-                const sBadge = document.createElement('span');
-                sBadge.className = 'tag-badge skill';
-                sBadge.textContent = skill;
-                skillsContainer.appendChild(sBadge);
+            // Render social links
+            const gh = document.getElementById('profile-link-github');
+            const li = document.getElementById('profile-link-linkedin');
+            
+            if (profile.github) {
+                gh.style.display = 'inline-flex';
+                gh.href = `https://github.com/${profile.github}`;
+            } else {
+                gh.style.display = 'none';
+            }
+
+            if (profile.linkedin) {
+                li.style.display = 'inline-flex';
+                li.href = `https://linkedin.com/in/${profile.linkedin}`;
+            } else {
+                li.style.display = 'none';
+            }
+
+            // Calculate Karma Score
+            let receivedUpvotesCount = 0;
+            myRedditPosts.forEach(p => {
+                if (p.upvotes) receivedUpvotesCount += p.upvotes.length;
+            });
+
+            const karmaScore = (myRedditPosts.length * 5) + (receivedUpvotesCount * 2) + (myItems.length * 10);
+            document.getElementById('profile-karma-value').textContent = karmaScore;
+
+            // Renders Activity Lists
+            this.renderProfileActivityTabs(myItems, myRedditPosts);
+
+            // Renders Teams Tab
+            const teamsGrid = document.getElementById('profile-teams-grid');
+            teamsGrid.innerHTML = '';
+            if (myTeams.length === 0) {
+                teamsGrid.innerHTML = `
+                    <div style="grid-column:1/-1; text-align:center; padding: 2rem; color:var(--text-muted);">
+                        <i data-lucide="users" style="width:32px; height:32px; margin-bottom:10px;"></i>
+                        <p>No project teams created yet.</p>
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+            } else {
+                myTeams.forEach(team => {
+                    const card = document.createElement('div');
+                    card.className = 'feature-card glass-panel team-card';
+                    const appCount = (team.applicants || []).length;
+                    card.innerHTML = `
+                        <div style="text-align: left; height:100%; display:flex; flex-direction:column; justify-content:space-between;">
+                            <h4 style="margin-bottom: 0.5rem;">${team.teamName}</h4>
+                            <p style="font-size:0.8rem; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${team.description}</p>
+                            <div style="margin-top:1.5rem;">
+                                <button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; font-size:0.8rem; padding: 0.4rem;">Manage Applicants (${appCount})</button>
+                            </div>
+                        </div>
+                    `;
+                    teamsGrid.appendChild(card);
+                });
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
+        if (this.isSupabaseEnabled()) {
+            const listingsPromise = supabaseClient.from("listings").select("*").eq("seller_email", this.currentUser.email);
+            const postsPromise = supabaseClient.from("reddit_posts").select("*").eq("author_email", this.currentUser.email);
+            const teamsPromise = supabaseClient.from("teams").select("*").eq("created_by_email", this.currentUser.email);
+            const profilePromise = supabaseClient.from("profiles").select("*").eq("email", this.currentUser.email).maybeSingle();
+
+            Promise.all([listingsPromise, postsPromise, teamsPromise, profilePromise]).then(([listingsRes, postsRes, teamsRes, profileRes]) => {
+                if (listingsRes.error) throw listingsRes.error;
+                if (postsRes.error) throw postsRes.error;
+                if (teamsRes.error) throw teamsRes.error;
+                if (profileRes.error) throw profileRes.error;
+
+                const myItems = (listingsRes.data || []).map(item => ({
+                    ...item,
+                    sellerName: item.seller_name,
+                    sellerEmail: item.seller_email
+                }));
+
+                const myRedditPosts = (postsRes.data || []).map(p => ({
+                    ...p,
+                    authorName: p.author_name,
+                    authorEmail: p.author_email,
+                    commentsCount: p.comments_count
+                }));
+
+                const myTeams = (teamsRes.data || []).map(t => ({
+                    ...t,
+                    teamName: t.team_name,
+                    openRoles: t.open_roles,
+                    createdBy: t.created_by,
+                    createdByEmail: t.created_by_email
+                }));
+
+                const profile = profileRes.data ? profileRes.data : { bio: "", skills: [], github: "", linkedin: "" };
+
+                renderProfileWithData(profile, myItems, myRedditPosts, myTeams);
+            }).catch(err => {
+                console.error("Failed to load user profile from Supabase:", err);
             });
         } else {
-            skillsContainer.innerHTML = `<span class="text-muted italic" id="profile-skills-placeholder">No skills listed yet.</span>`;
+            // Local mode
+            const profileKey = `cl_profile_${this.currentUser.email}`;
+            const profile = JSON.parse(localStorage.getItem(profileKey)) || { bio: "", skills: [], github: "", linkedin: "" };
+
+            const redditPosts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+            const myRedditPosts = redditPosts.filter(p => p.authorEmail === this.currentUser.email);
+
+            const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+            const myItems = listings.filter(item => item.sellerEmail === this.currentUser.email);
+
+            const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+            const myTeams = teams.filter(t => t.createdByEmail === this.currentUser.email);
+
+            renderProfileWithData(profile, myItems, myRedditPosts, myTeams);
         }
-
-        // Render social links
-        const gh = document.getElementById('profile-link-github');
-        const li = document.getElementById('profile-link-linkedin');
-        
-        if (profile.github) {
-            gh.style.display = 'inline-flex';
-            gh.href = `https://github.com/${profile.github}`;
-        } else {
-            gh.style.display = 'none';
-        }
-
-        if (profile.linkedin) {
-            li.style.display = 'inline-flex';
-            li.href = `https://linkedin.com/in/${profile.linkedin}`;
-        } else {
-            li.style.display = 'none';
-        }
-
-        // Calculate Karma Score
-        // formula: posts made × 5 + upvotes received × 2 + items listed × 10
-        const redditPosts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-        const myRedditPosts = redditPosts.filter(p => p.authorEmail === this.currentUser.email);
-        const myPostsCount = myRedditPosts.length;
-
-        // Sum upvotes on my posts
-        let receivedUpvotesCount = 0;
-        myRedditPosts.forEach(p => {
-            if (p.upvotes) receivedUpvotesCount += p.upvotes.length;
-        });
-
-        // Items sold/listed
-        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-        const myItems = listings.filter(item => item.sellerEmail === this.currentUser.email);
-        const myItemsCount = myItems.length;
-
-        const karmaScore = (myPostsCount * 5) + (receivedUpvotesCount * 2) + (myItemsCount * 10);
-        document.getElementById('profile-karma-value').textContent = karmaScore;
-
-        // Renders Activity Lists
-        this.renderProfileActivityTabs(myItems, myRedditPosts);
     },
 
     renderProfileActivityTabs(myItems, myRedditPosts) {
@@ -1578,7 +2003,7 @@ const app = {
         // Tab 2: Teams
         const teamsGrid = document.getElementById('profile-teams-grid');
         teamsGrid.innerHTML = '';
-        const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+        const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
         const myTeams = teams.filter(t => t.createdByEmail === this.currentUser.email);
 
         if (myTeams.length === 0) {
@@ -1651,8 +2076,59 @@ const app = {
         const listContainer = document.getElementById('chat-thread-list');
         if (!listContainer) return;
 
-        const inboxKey = `cl_messages_${this.currentUser.email}`;
-        const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+        if (this.isSupabaseEnabled()) {
+            const qA = supabaseClient.from("chats").select("*").eq("user_a", this.currentUser.email);
+            const qB = supabaseClient.from("chats").select("*").eq("user_b", this.currentUser.email);
+
+            Promise.all([qA, qB]).then(({0: snapA, 1: snapB}) => {
+                if (snapA.error) throw snapA.error;
+                if (snapB.error) throw snapB.error;
+
+                const chatDocs = [];
+                const seenRoomIds = new Set();
+
+                const processSnap = (res) => {
+                    (res.data || []).forEach(doc => {
+                        if (!seenRoomIds.has(doc.room_id)) {
+                            seenRoomIds.add(doc.room_id);
+                            chatDocs.push(doc);
+                        }
+                    });
+                };
+                processSnap(snapA);
+                processSnap(snapB);
+
+                const inbox = {};
+                
+                // Always ensure campuslink_ai is in the inbox (even if no local msgs)
+                const localInboxKey = `cl_messages_${this.currentUser.email}`;
+                const localInbox = JSON.parse(localStorage.getItem(localInboxKey)) || {};
+                if (localInbox["campuslink_ai"]) {
+                    inbox["campuslink_ai"] = localInbox["campuslink_ai"];
+                } else {
+                    inbox["campuslink_ai"] = [];
+                }
+
+                chatDocs.forEach(chat => {
+                    const peer = chat.user_a === this.currentUser.email ? chat.user_b : chat.user_a;
+                    inbox[peer] = chat.messages || [];
+                });
+
+                this.renderSidebarWithInbox(inbox);
+            }).catch(err => {
+                console.error("Failed to load chat threads in sidebar:", err);
+            });
+        } else {
+            const inboxKey = `cl_messages_${this.currentUser.email}`;
+            const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+            this.renderSidebarWithInbox(inbox);
+        }
+    },
+
+    renderSidebarWithInbox(inbox) {
+        const listContainer = document.getElementById('chat-thread-list');
+        if (!listContainer) return;
+
         const threads = Object.keys(inbox);
 
         listContainer.innerHTML = '';
@@ -1726,8 +2202,8 @@ const app = {
         chatContent.style.display = 'flex';
 
         // Load contact details
-        const users = JSON.parse(localStorage.getItem('cl_users')) || [];
         const isAi = this.activeChatEmail === "campuslink_ai";
+        const users = JSON.parse(localStorage.getItem('cl_users')) || [];
         const contact = isAi ? 
             { name: "CampusLink AI", branch: "Auto-Negotiator Bot" } :
             (users.find(u => u.email === this.activeChatEmail) || { name: this.activeChatEmail, branch: "VVCE" });
@@ -1751,7 +2227,12 @@ const app = {
             avatarNode.style.color = `var(--text-dark)`;
         }
 
-        // Mark messages as read
+        if (this.isSupabaseEnabled() && !isAi) {
+            // Handled by Realtime Subscription
+            return;
+        }
+
+        // Local mark messages as read
         const inboxKey = `cl_messages_${this.currentUser.email}`;
         let inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
         if (inbox[this.activeChatEmail]) {
@@ -1761,11 +2242,15 @@ const app = {
             localStorage.setItem(inboxKey, JSON.stringify(inbox));
         }
 
-        // Render Bubbles
+        const messages = inbox[this.activeChatEmail] || [];
+        this.renderChatPaneWithMessages(messages);
+    },
+
+    renderChatPaneWithMessages(messages) {
         const viewport = document.getElementById('chat-messages-viewport');
+        if (!viewport) return;
         viewport.innerHTML = '';
 
-        const messages = inbox[this.activeChatEmail] || [];
         messages.forEach(msg => {
             const bubble = document.createElement('div');
             const isMe = msg.sender === this.currentUser.email;
@@ -1786,10 +2271,79 @@ const app = {
         if (window.lucide) lucide.createIcons();
     },
 
+    getChatRoomId(emailA, emailB) {
+        return "chat_" + [emailA.toLowerCase(), emailB.toLowerCase()].sort().join('_').replace(/[@.]/g, '_');
+    },
+
     selectChatThread(email) {
         this.activeChatEmail = email;
-        this.renderChatPane();
+        
+        // Unsubscribe from previous channel if any
+        if (this.activeChatChannel) {
+            supabaseClient.removeChannel(this.activeChatChannel);
+            this.activeChatChannel = null;
+        }
+
         this.toggleChatSidebar(false); // Hide sidebar in mobile
+
+        const isAi = email === "campuslink_ai";
+
+        if (this.isSupabaseEnabled() && !isAi) {
+            const roomId = this.getChatRoomId(this.currentUser.email, email);
+            
+            // Fetch messages once initially
+            supabaseClient.from("chats").select("*").eq("room_id", roomId).maybeSingle().then(({ data: chatDoc, error }) => {
+                if (error) throw error;
+                let messages = [];
+
+                if (chatDoc) {
+                    messages = chatDoc.messages || [];
+                    
+                    // Mark peer's messages as read
+                    let updated = false;
+                    const updatedMessages = messages.map(m => {
+                        if (m.sender === email && m.unread) {
+                            m.unread = false;
+                            updated = true;
+                        }
+                        return m;
+                    });
+
+                    if (updated) {
+                        supabaseClient.from("chats").update({
+                            messages: updatedMessages
+                        }).eq("room_id", roomId).catch(err => console.error("Failed to update unread status:", err));
+                    }
+                } else {
+                    // Create the chat document if it doesn't exist
+                    supabaseClient.from("chats").insert({
+                        room_id: roomId,
+                        user_a: this.currentUser.email,
+                        user_b: email,
+                        messages: []
+                    }).catch(err => console.error("Failed to create room doc:", err));
+                }
+
+                this.renderChatPaneWithMessages(messages);
+            }).catch((err) => {
+                console.error("Failed to load chat thread:", err);
+            });
+
+            // Set up real-time channel subscription
+            this.activeChatChannel = supabaseClient
+                .channel(`room_${roomId}`)
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'chats', filter: `room_id=eq.${roomId}` },
+                    (payload) => {
+                        const messages = payload.new.messages || [];
+                        this.renderChatPaneWithMessages(messages);
+                    }
+                )
+                .subscribe();
+        } else {
+            this.renderChatPane();
+        }
     },
 
     toggleChatSidebar(show) {
@@ -1817,22 +2371,55 @@ const app = {
     },
 
     updateUnreadCountBadge() {
-        const inboxKey = `cl_messages_${this.currentUser.email}`;
-        const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
-        let totalUnread = 0;
+        if (this.isSupabaseEnabled()) {
+            // Count unread from our snapshot inbox representation
+            const qA = supabaseClient.from("chats").select("*").eq("user_a", this.currentUser.email);
+            const qB = supabaseClient.from("chats").select("*").eq("user_b", this.currentUser.email);
 
-        Object.keys(inbox).forEach(email => {
-            const thread = inbox[email] || [];
-            totalUnread += thread.filter(m => m.sender === email && m.unread).length;
-        });
+            Promise.all([qA, qB]).then(({0: snapA, 1: snapB}) => {
+                let totalUnread = 0;
+                const seenRoomIds = new Set();
 
-        const badge = document.getElementById('nav-chat-badge');
-        if (badge) {
-            if (totalUnread > 0) {
-                badge.style.display = 'inline-flex';
-                badge.textContent = totalUnread;
-            } else {
-                badge.style.display = 'none';
+                const processSnap = (res) => {
+                    (res.data || []).forEach(doc => {
+                        if (!seenRoomIds.has(doc.room_id)) {
+                            seenRoomIds.add(doc.room_id);
+                            const msgs = doc.messages || [];
+                            totalUnread += msgs.filter(m => m.sender !== this.currentUser.email && m.unread).length;
+                        }
+                    });
+                };
+                processSnap(snapA);
+                processSnap(snapB);
+
+                const badge = document.getElementById('nav-chat-badge');
+                if (badge) {
+                    if (totalUnread > 0) {
+                        badge.style.display = 'inline-flex';
+                        badge.textContent = totalUnread;
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            }).catch(err => console.error("Failed to update unread badge:", err));
+        } else {
+            const inboxKey = `cl_messages_${this.currentUser.email}`;
+            const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+            let totalUnread = 0;
+
+            Object.keys(inbox).forEach(email => {
+                const thread = inbox[email] || [];
+                totalUnread += thread.filter(m => m.sender === email && m.unread).length;
+            });
+
+            const badge = document.getElementById('nav-chat-badge');
+            if (badge) {
+                if (totalUnread > 0) {
+                    badge.style.display = 'inline-flex';
+                    badge.textContent = totalUnread;
+                } else {
+                    badge.style.display = 'none';
+                }
             }
         }
     },
@@ -1861,22 +2448,36 @@ const app = {
                 btn.classList.add('loading');
                 btn.disabled = true;
 
-                setTimeout(() => {
-                    const users = JSON.parse(localStorage.getItem('cl_users')) || [];
-                    const user = users.find(u => u.email === email && u.password === password);
-
-                    if (user) {
-                        localStorage.setItem('cl_current_user', JSON.stringify(user));
-                        this.showToast(`Welcome back, ${user.name}!`, "success");
-                        
-                        this.checkAuthSession();
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.auth.signInWithPassword({ email, password }).then(({ data, error }) => {
+                        if (error) throw error;
+                        this.showToast("Signed in successfully!", "success");
                         signinForm.reset();
-                    } else {
-                        this.showToast("Invalid email credentials or password", "error");
                         btn.classList.remove('loading');
                         btn.disabled = false;
-                    }
-                }, 1200);
+                    }).catch((err) => {
+                        this.showToast(err.message || "Invalid credentials", "error");
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    });
+                } else {
+                    setTimeout(() => {
+                        const users = JSON.parse(localStorage.getItem('cl_users')) || [];
+                        const user = users.find(u => u.email === email && u.password === password);
+
+                        if (user) {
+                            localStorage.setItem('cl_current_user', JSON.stringify(user));
+                            this.showToast(`Welcome back, ${user.name}!`, "success");
+                            
+                            this.checkAuthSession();
+                            signinForm.reset();
+                        } else {
+                            this.showToast("Invalid email credentials or password", "error");
+                        }
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    }, 1200);
+                }
             });
         }
 
@@ -1897,36 +2498,65 @@ const app = {
                 btn.classList.add('loading');
                 btn.disabled = true;
 
-                setTimeout(() => {
-                    let users = JSON.parse(localStorage.getItem('cl_users')) || [];
-                    const exists = users.some(u => u.email === email);
-
-                    if (exists) {
-                        this.showToast("An account already exists with this email", "error");
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.auth.signUp({ email, password }).then(({ data, error }) => {
+                        if (error) throw error;
+                        const newUser = { name, email, branch, semester, phone };
+                        return supabaseClient.from("users").insert(newUser).then(({ error: insertErr }) => {
+                            if (insertErr) throw insertErr;
+                            return supabaseClient.from("profiles").insert({
+                                email,
+                                bio: "",
+                                skills: [],
+                                github: "",
+                                linkedin: ""
+                            });
+                        }).then(({ error: profErr }) => {
+                            if (profErr) throw profErr;
+                            this.showToast("Account created successfully!", "success");
+                            signupForm.reset();
+                            btn.classList.remove('loading');
+                            btn.disabled = false;
+                        });
+                    }).catch((err) => {
+                        this.showToast(err.message || "Registration failed", "error");
                         btn.classList.remove('loading');
                         btn.disabled = false;
-                        return;
-                    }
+                    });
+                } else {
+                    setTimeout(() => {
+                        let users = JSON.parse(localStorage.getItem('cl_users')) || [];
+                        const exists = users.some(u => u.email === email);
 
-                    const newUser = { name, email, branch, semester, phone, password };
-                    users.push(newUser);
-                    localStorage.setItem('cl_users', JSON.stringify(users));
+                        if (exists) {
+                            this.showToast("An account already exists with this email", "error");
+                            btn.classList.remove('loading');
+                            btn.disabled = false;
+                            return;
+                        }
 
-                    // Init default empty profile
-                    const profileKey = `cl_profile_${email}`;
-                    localStorage.setItem(profileKey, JSON.stringify({
-                        bio: "",
-                        skills: [],
-                        github: "",
-                        linkedin: ""
-                    }));
+                        const newUser = { name, email, branch, semester, phone, password };
+                        users.push(newUser);
+                        localStorage.setItem('cl_users', JSON.stringify(users));
 
-                    localStorage.setItem('cl_current_user', JSON.stringify(newUser));
-                    this.showToast(`Registration successful! Welcome to CampusLink.`, "success");
-                    
-                    this.checkAuthSession();
-                    signupForm.reset();
-                }, 1200);
+                        // Init default empty profile
+                        const profileKey = `cl_profile_${email}`;
+                        localStorage.setItem(profileKey, JSON.stringify({
+                            bio: "",
+                            skills: [],
+                            github: "",
+                            linkedin: ""
+                        }));
+
+                        localStorage.setItem('cl_current_user', JSON.stringify(newUser));
+                        this.showToast(`Registration successful! Welcome to CampusLink.`, "success");
+                        
+                        this.checkAuthSession();
+                        signupForm.reset();
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    }, 1200);
+                }
             });
         }
 
@@ -1941,13 +2571,30 @@ const app = {
                 btn.classList.add('loading');
                 btn.disabled = true;
 
-                setTimeout(() => {
-                    this.showToast("Reset password instructions sent to your VVCE email!", "success");
-                    btn.classList.remove('loading');
-                    btn.disabled = false;
-                    this.closeModal('forgot-password-modal');
-                    forgotForm.reset();
-                }, 1200);
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.origin
+                    }).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast("Reset password instructions sent to your VVCE email!", "success");
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        this.closeModal('forgot-password-modal');
+                        forgotForm.reset();
+                    }).catch((err) => {
+                        this.showToast(err.message || "Failed to send reset email", "error");
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    });
+                } else {
+                    setTimeout(() => {
+                        this.showToast("Reset password instructions sent to your VVCE email!", "success");
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                        this.closeModal('forgot-password-modal');
+                        forgotForm.reset();
+                    }, 1200);
+                }
             });
         }
 
@@ -1979,26 +2626,57 @@ const app = {
                     category,
                     condition,
                     description,
-                    sellerName: this.currentUser.name,
-                    sellerEmail: this.currentUser.email,
+                    seller_name: this.currentUser.name,
+                    seller_email: this.currentUser.email,
                     image: chosenImage,
                     timestamp: "Just now"
                 };
 
-                listings.unshift(newListing);
-                localStorage.setItem('cl_listings', JSON.stringify(listings));
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("listings").insert(newListing).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast("Your item has been posted on the marketplace!", "success");
+                        postForm.reset();
+                        
+                        const dz = document.getElementById('drop-zone');
+                        if (dz) {
+                            const p = dz.querySelector('p');
+                            p.textContent = "Drag & drop or click to upload";
+                            p.style.color = 'var(--text-main)';
+                        }
+                        this.navigate('browse');
+                    }).catch((err) => {
+                        console.error("Failed to post item to Supabase:", err);
+                        this.showToast("Failed to post cloud listing", "error");
+                    });
+                } else {
+                    const localListing = {
+                        id: newListing.id,
+                        title,
+                        price,
+                        category,
+                        condition,
+                        description,
+                        sellerName: this.currentUser.name,
+                        sellerEmail: this.currentUser.email,
+                        image: chosenImage,
+                        timestamp: "Just now"
+                    };
+                    listings.unshift(localListing);
+                    localStorage.setItem('cl_listings', JSON.stringify(listings));
 
-                this.showToast("Your item has been posted on the marketplace!", "success");
-                postForm.reset();
-                
-                const dz = document.getElementById('drop-zone');
-                if (dz) {
-                    const p = dz.querySelector('p');
-                    p.textContent = "Drag & drop or click to upload";
-                    p.style.color = 'var(--text-main)';
+                    this.showToast("Your item has been posted on the marketplace!", "success");
+                    postForm.reset();
+                    
+                    const dz = document.getElementById('drop-zone');
+                    if (dz) {
+                        const p = dz.querySelector('p');
+                        p.textContent = "Drag & drop or click to upload";
+                        p.style.color = 'var(--text-main)';
+                    }
+
+                    this.navigate('browse');
                 }
-
-                this.navigate('browse');
             });
         }
 
@@ -2015,24 +2693,46 @@ const app = {
                 const condition = document.querySelector('input[name="edit-item-condition"]:checked').value;
                 const description = document.getElementById('edit-item-desc').value.trim();
 
-                let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-                const idx = listings.findIndex(item => item.id === id);
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("listings").update({
+                        title,
+                        price,
+                        category,
+                        condition,
+                        description
+                    }).eq("id", id).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast("Item listing updated successfully!", "success");
+                        this.closeModal('edit-listing-modal');
+                        if (this.currentView === 'browse') {
+                            this.renderProducts();
+                        } else if (this.currentView === 'profile') {
+                            this.renderProfile();
+                        }
+                    }).catch((err) => {
+                        console.error("Failed to update Supabase listing:", err);
+                        this.showToast("Failed to update cloud listing", "error");
+                    });
+                } else {
+                    let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+                    const idx = listings.findIndex(item => item.id === id);
 
-                if (idx > -1) {
-                    listings[idx].title = title;
-                    listings[idx].price = price;
-                    listings[idx].category = category;
-                    listings[idx].condition = condition;
-                    listings[idx].description = description;
+                    if (idx > -1) {
+                        listings[idx].title = title;
+                        listings[idx].price = price;
+                        listings[idx].category = category;
+                        listings[idx].condition = condition;
+                        listings[idx].description = description;
 
-                    localStorage.setItem('cl_listings', JSON.stringify(listings));
-                    this.showToast("Item listing updated successfully!", "success");
-                    this.closeModal('edit-listing-modal');
-                    
-                    if (this.currentView === 'browse') {
-                        this.filterListings();
-                    } else if (this.currentView === 'profile') {
-                        this.renderProfile();
+                        localStorage.setItem('cl_listings', JSON.stringify(listings));
+                        this.showToast("Item listing updated successfully!", "success");
+                        this.closeModal('edit-listing-modal');
+                        
+                        if (this.currentView === 'browse') {
+                            this.filterListings();
+                        } else if (this.currentView === 'profile') {
+                            this.renderProfile();
+                        }
                     }
                 }
             });
@@ -2049,30 +2749,52 @@ const app = {
                 const skills = document.getElementById('team-skills').value.trim();
                 const openRoles = document.getElementById('team-roles').value.trim();
 
-                const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
-
                 const newTeam = {
                     id: Date.now(),
-                    teamName,
+                    team_name: teamName,
                     description,
                     skills,
-                    openRoles,
-                    createdBy: this.currentUser.name,
-                    createdByEmail: this.currentUser.email,
+                    open_roles: openRoles,
+                    created_by: this.currentUser.name,
+                    created_by_email: this.currentUser.email,
                     applicants: []
                 };
 
-                teams.push(newTeam);
-                localStorage.setItem('cl_teams', JSON.stringify(teams));
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("teams").insert(newTeam).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast("New project squad posted successfully!", "success");
+                        createTeamForm.reset();
+                        this.closeModal('create-team-modal');
+                        this.renderTeams();
+                    }).catch((err) => {
+                        console.error("Failed to save team in Supabase:", err);
+                        this.showToast("Failed to create cloud team", "error");
+                    });
+                } else {
+                    const localTeam = {
+                        id: newTeam.id,
+                        teamName,
+                        description,
+                        skills,
+                        openRoles,
+                        createdBy: this.currentUser.name,
+                        createdByEmail: this.currentUser.email,
+                        applicants: []
+                    };
+                    const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+                    teams.push(localTeam);
+                    localStorage.setItem('cl_teams', JSON.stringify(teams));
 
-                this.showToast("Your project team recruitment is active!", "success");
-                this.closeModal('create-team-modal');
-                createTeamForm.reset();
-                
-                if (this.currentView === 'collab') {
-                    this.renderTeams();
-                } else if (this.currentView === 'profile') {
-                    this.renderProfile();
+                    this.showToast("Your project team recruitment is active!", "success");
+                    this.closeModal('create-team-modal');
+                    createTeamForm.reset();
+                    
+                    if (this.currentView === 'collab') {
+                        this.renderTeams();
+                    } else if (this.currentView === 'profile') {
+                        this.renderProfile();
+                    }
                 }
             });
         }
@@ -2088,25 +2810,44 @@ const app = {
                 const members = document.getElementById('reg-members').value.trim();
                 const phone = document.getElementById('reg-phone').value.trim();
 
-                let registrations = JSON.parse(localStorage.getItem('cl_hackathon_registrations')) || [];
-                
-                // Add registration record
-                registrations.push({
-                    hackathonId: hackId,
-                    teamName,
-                    members,
-                    phone,
-                    userEmail: this.currentUser.email
-                });
-                localStorage.setItem('cl_hackathon_registrations', JSON.stringify(registrations));
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("hackathon_registrations").insert({
+                        hackathon_id: hackId,
+                        team_name: teamName,
+                        members,
+                        phone,
+                        user_email: this.currentUser.email
+                    }).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast(`Team ${teamName} registered successfully!`, "success");
+                        this.closeModal('register-hackathon-modal');
+                        regHackForm.reset();
+                        this.renderHackathons();
+                    }).catch((err) => {
+                        console.error("Failed to save hackathon registration in Supabase:", err);
+                        this.showToast("Failed to register hackathon team", "error");
+                    });
+                } else {
+                    let registrations = JSON.parse(localStorage.getItem('cl_hackathon_registrations')) || [];
+                    
+                    // Add registration record
+                    registrations.push({
+                        hackathonId: hackId,
+                        teamName,
+                        members,
+                        phone,
+                        userEmail: this.currentUser.email
+                    });
+                    localStorage.setItem('cl_hackathon_registrations', JSON.stringify(registrations));
 
-                // Success toast & close
-                this.showToast(`Team ${teamName} registered successfully!`, "success");
-                this.closeModal('register-hackathon-modal');
-                regHackForm.reset();
+                    // Success toast & close
+                    this.showToast(`Team ${teamName} registered successfully!`, "success");
+                    this.closeModal('register-hackathon-modal');
+                    regHackForm.reset();
 
-                // Re-render
-                this.renderHackathons();
+                    // Re-render
+                    this.renderHackathons();
+                }
             });
         }
 
@@ -2121,35 +2862,66 @@ const app = {
                 const flair = document.getElementById('reddit-post-flair').value;
                 const body = document.getElementById('reddit-post-body').value.trim();
 
-                let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-
                 const newPost = {
                     id: Date.now(),
                     subreddit,
                     title,
                     flair,
                     body,
-                    authorName: this.currentUser.name,
-                    authorEmail: this.currentUser.email,
+                    author_name: this.currentUser.name,
+                    author_email: this.currentUser.email,
                     timestamp: "Just now",
                     upvotes: [this.currentUser.email], // self upvote
                     downvotes: [],
-                    commentsCount: 0
+                    comments_count: 0
                 };
 
-                posts.unshift(newPost);
-                localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("reddit_posts").insert(newPost).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast(`Post published to r/${subreddit}!`, "success");
+                        this.closeModal('new-reddit-post-modal');
+                        createRedditPostForm.reset();
 
-                this.showToast(`Post published to r/${subreddit}!`, "success");
-                this.closeModal('new-reddit-post-modal');
-                createRedditPostForm.reset();
+                        if (this.currentView === 'reddit') {
+                            this.activeSubreddit = subreddit; // Auto navigate to posted subreddit
+                            this.renderRedditPosts();
+                        } else if (this.currentView === 'profile') {
+                            this.renderProfile();
+                        }
+                    }).catch((err) => {
+                        console.error("Failed to create post in Supabase:", err);
+                        this.showToast("Failed to publish cloud post", "error");
+                    });
+                } else {
+                    const localPost = {
+                        id: newPost.id,
+                        subreddit,
+                        title,
+                        flair,
+                        body,
+                        authorName: this.currentUser.name,
+                        authorEmail: this.currentUser.email,
+                        timestamp: "Just now",
+                        upvotes: [this.currentUser.email],
+                        downvotes: [],
+                        commentsCount: 0
+                    };
+                    let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+                    posts.unshift(localPost);
+                    localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
 
-                // Re-render
-                if (this.currentView === 'reddit') {
-                    this.activeSubreddit = subreddit; // Auto navigate to posted subreddit
-                    this.renderRedditPosts();
-                } else if (this.currentView === 'profile') {
-                    this.renderProfile();
+                    this.showToast(`Post published to r/${subreddit}!`, "success");
+                    this.closeModal('new-reddit-post-modal');
+                    createRedditPostForm.reset();
+
+                    // Re-render
+                    if (this.currentView === 'reddit') {
+                        this.activeSubreddit = subreddit; // Auto navigate to posted subreddit
+                        this.renderRedditPosts();
+                    } else if (this.currentView === 'profile') {
+                        this.renderProfile();
+                    }
                 }
             });
         }
@@ -2170,13 +2942,14 @@ const app = {
                 const newMsg = {
                     sender: this.currentUser.email,
                     text: text,
-                    timestamp: "Just now",
+                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     unread: false
                 };
 
                 const isAi = this.activeChatEmail === "campuslink_ai";
 
                 if (isAi) {
+                    newMsg.timestamp = "Just now"; // Keep simple local timestamp for mock AI
                     if (!buyerInbox["campuslink_ai"]) buyerInbox["campuslink_ai"] = [];
                     buyerInbox["campuslink_ai"].push(newMsg);
                     localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
@@ -2220,8 +2993,31 @@ const app = {
                         this.renderChatSidebar();
                     }, 1200);
 
+                } else if (this.isSupabaseEnabled()) {
+                    const roomId = this.getChatRoomId(this.currentUser.email, this.activeChatEmail);
+                    const cloudMsg = {
+                        sender: this.currentUser.email,
+                        text: text,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        unread: true
+                    };
+
+                    supabaseClient.from("chats").select("messages").eq("room_id", roomId).maybeSingle().then(({ data, error }) => {
+                        if (error) throw error;
+                        const messages = data ? (data.messages || []) : [];
+                        messages.push(cloudMsg);
+                        return supabaseClient.from("chats").update({ messages }).eq("room_id", roomId);
+                    }).then(({ error }) => {
+                        if (error) throw error;
+                        input.value = '';
+                        input.focus();
+                    }).catch((err) => {
+                        console.error("Failed to send Supabase message:", err);
+                        this.showToast("Failed to send message", "error");
+                    });
                 } else {
                     // Standard message to real student
+                    newMsg.timestamp = "Just now"; // Keep local simple timestamp
                     const sellerInboxKey = `cl_messages_${this.activeChatEmail}`;
                     let sellerInbox = JSON.parse(localStorage.getItem(sellerInboxKey)) || {};
 
@@ -2259,15 +3055,28 @@ const app = {
                 const linkedin = document.getElementById('edit-linkedin').value.trim();
 
                 const skills = skillsInput === "" ? [] : skillsInput.split(',').map(s => s.trim()).filter(s => s !== "");
-
-                const profileKey = `cl_profile_${this.currentUser.email}`;
                 const updatedProfile = { bio, skills, github, linkedin };
 
-                localStorage.setItem(profileKey, JSON.stringify(updatedProfile));
-                this.showToast("Your profile dashboard has been updated!", "success");
-                this.closeModal('edit-profile-modal');
-                
-                this.renderProfile();
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("profiles").upsert({
+                        email: this.currentUser.email,
+                        ...updatedProfile
+                    }).then(({ error }) => {
+                        if (error) throw error;
+                        this.showToast("Your profile dashboard has been updated!", "success");
+                        this.closeModal('edit-profile-modal');
+                        this.renderProfile();
+                    }).catch((err) => {
+                        console.error("Failed to update Supabase profile:", err);
+                        this.showToast("Failed to update cloud profile", "error");
+                    });
+                } else {
+                    const profileKey = `cl_profile_${this.currentUser.email}`;
+                    localStorage.setItem(profileKey, JSON.stringify(updatedProfile));
+                    this.showToast("Your profile dashboard has been updated!", "success");
+                    this.closeModal('edit-profile-modal');
+                    this.renderProfile();
+                }
             });
         }
 
@@ -2311,13 +3120,24 @@ const app = {
         const origOpenModal = this.openModal;
         this.openModal = (modalId) => {
             if (modalId === 'edit-profile-modal') {
-                const profileKey = `cl_profile_${this.currentUser.email}`;
-                const profile = JSON.parse(localStorage.getItem(profileKey)) || { bio: "", skills: [], github: "", linkedin: "" };
+                if (this.isSupabaseEnabled()) {
+                    supabaseClient.from("profiles").select("*").eq("email", this.currentUser.email).maybeSingle().then(({ data: profile, error }) => {
+                        if (error) throw error;
+                        const prof = profile || { bio: "", skills: [], github: "", linkedin: "" };
+                        document.getElementById('edit-bio').value = prof.bio || "";
+                        document.getElementById('edit-skills').value = (prof.skills || []).join(', ');
+                        document.getElementById('edit-github').value = prof.github || "";
+                        document.getElementById('edit-linkedin').value = prof.linkedin || "";
+                    }).catch(err => console.error("Failed to fetch profile for editing:", err));
+                } else {
+                    const profileKey = `cl_profile_${this.currentUser.email}`;
+                    const profile = JSON.parse(localStorage.getItem(profileKey)) || { bio: "", skills: [], github: "", linkedin: "" };
 
-                document.getElementById('edit-bio').value = profile.bio || "";
-                document.getElementById('edit-skills').value = (profile.skills || []).join(', ');
-                document.getElementById('edit-github').value = profile.github || "";
-                document.getElementById('edit-linkedin').value = profile.linkedin || "";
+                    document.getElementById('edit-bio').value = profile.bio || "";
+                    document.getElementById('edit-skills').value = (profile.skills || []).join(', ');
+                    document.getElementById('edit-github').value = profile.github || "";
+                    document.getElementById('edit-linkedin').value = profile.linkedin || "";
+                }
             }
             origOpenModal.call(this, modalId);
         };
@@ -2330,12 +3150,27 @@ const app = {
 
     logout() {
         sessionStorage.setItem('cl_logged_out_once', 'true');
-        localStorage.removeItem('cl_current_user');
-        this.currentUser = null;
-        this.activeChatEmail = null;
-        this.currentView = 'home';
-        this.showToast("Logged out successfully!", "info");
-        this.checkAuthSession();
+        if (this.isSupabaseEnabled()) {
+            if (this.activeChatChannel) {
+                supabaseClient.removeChannel(this.activeChatChannel);
+                this.activeChatChannel = null;
+            }
+            supabaseClient.auth.signOut().then(() => {
+                this.currentUser = null;
+                this.activeChatEmail = null;
+                this.currentView = 'home';
+                this.showToast("Logged out successfully!", "info");
+            }).catch((err) => {
+                console.error("Sign out failed:", err);
+            });
+        } else {
+            localStorage.removeItem('cl_current_user');
+            this.currentUser = null;
+            this.activeChatEmail = null;
+            this.currentView = 'home';
+            this.showToast("Logged out successfully!", "info");
+            this.checkAuthSession();
+        }
     },
 
     /* ==========================================================================
