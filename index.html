@@ -552,9 +552,12 @@
                                 <div class="karma-value" id="profile-karma-value">0</div>
                             </div>
                             
-                            <div class="text-center" style="margin-top: 1.5rem;">
+                            <div class="text-center" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.50rem;">
                                 <button class="btn btn-primary btn-sm" onclick="app.openModal('edit-profile-modal')" style="width: 100%;">
-                                    <i data-lucide="edit"></i> Edit Profile
+                                    <i data-lucide="edit" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"></i> Edit Profile
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="app.logout()" style="width: 100%; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); color: #ef4444; transition: var(--transition);">
+                                    <i data-lucide="log-out" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"></i> Logout
                                 </button>
                             </div>
                             
