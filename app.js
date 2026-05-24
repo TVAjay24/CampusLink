@@ -10,8 +10,8 @@
  * If left empty, the application will seamlessly fall back to local localStorage database mode.
  */
 const supabaseConfig = {
-    url: "YOUR_SUPABASE_URL",
-    anonKey: "YOUR_SUPABASE_ANON_KEY"
+    url: "https://guzxcmrcngvaahcrjbrs.supabase.co",
+    anonKey: "sb_publishable_zispv_t6jezhzOpmnfsVlg_n7KG84eH"
 };
 
 // Initialize Supabase dynamically if keys are configured
