@@ -2112,6 +2112,7 @@ const app = {
                     localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
                     
                     input.value = '';
+                    input.focus();
                     this.renderChatPane();
                     this.renderChatSidebar();
 
@@ -2166,6 +2167,7 @@ const app = {
                     localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
 
                     input.value = '';
+                    input.focus();
                     this.renderChatPane();
                     this.renderChatSidebar();
 
