@@ -2612,29 +2612,77 @@ const app = {
 
                 const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
 
-                let dummyImages = [
-                    "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=600",
-                    "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&q=80&w=600",
-                    "https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?auto=format&fit=crop&q=80&w=600"
-                ];
-                let chosenImage = dummyImages[Math.floor(Math.random() * dummyImages.length)];
+                const fileInput = document.getElementById('file-input');
+                let uploadPromise = Promise.resolve(null);
 
-                const newListing = {
-                    id: Date.now(),
-                    title,
-                    price,
-                    category,
-                    condition,
-                    description,
-                    seller_name: this.currentUser.name,
-                    seller_email: this.currentUser.email,
-                    image: chosenImage,
-                    timestamp: "Just now"
-                };
+                if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    uploadPromise = new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            resolve(event.target.result);
+                        };
+                        reader.onerror = () => {
+                            resolve(null);
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                }
 
-                if (this.isSupabaseEnabled()) {
-                    supabaseClient.from("listings").insert(newListing).then(({ error }) => {
-                        if (error) throw error;
+                uploadPromise.then((base64Image) => {
+                    let dummyImages = [
+                        "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=600",
+                        "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&q=80&w=600",
+                        "https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?auto=format&fit=crop&q=80&w=600"
+                    ];
+                    let chosenImage = base64Image ? base64Image : dummyImages[Math.floor(Math.random() * dummyImages.length)];
+
+                    const newListing = {
+                        id: Date.now(),
+                        title,
+                        price,
+                        category,
+                        condition,
+                        description,
+                        seller_name: this.currentUser.name,
+                        seller_email: this.currentUser.email,
+                        image: chosenImage,
+                        timestamp: "Just now"
+                    };
+
+                    if (this.isSupabaseEnabled()) {
+                        supabaseClient.from("listings").insert(newListing).then(({ error }) => {
+                            if (error) throw error;
+                            this.showToast("Your item has been posted on the marketplace!", "success");
+                            postForm.reset();
+                            
+                            const dz = document.getElementById('drop-zone');
+                            if (dz) {
+                                const p = dz.querySelector('p');
+                                p.textContent = "Drag & drop or click to upload";
+                                p.style.color = 'var(--text-main)';
+                            }
+                            this.navigate('browse');
+                        }).catch((err) => {
+                            console.error("Failed to post item to Supabase:", err);
+                            this.showToast("Failed to post cloud listing", "error");
+                        });
+                    } else {
+                        const localListing = {
+                            id: newListing.id,
+                            title,
+                            price,
+                            category,
+                            condition,
+                            description,
+                            sellerName: this.currentUser.name,
+                            sellerEmail: this.currentUser.email,
+                            image: chosenImage,
+                            timestamp: "Just now"
+                        };
+                        listings.unshift(localListing);
+                        localStorage.setItem('cl_listings', JSON.stringify(listings));
+
                         this.showToast("Your item has been posted on the marketplace!", "success");
                         postForm.reset();
                         
@@ -2644,39 +2692,10 @@ const app = {
                             p.textContent = "Drag & drop or click to upload";
                             p.style.color = 'var(--text-main)';
                         }
+
                         this.navigate('browse');
-                    }).catch((err) => {
-                        console.error("Failed to post item to Supabase:", err);
-                        this.showToast("Failed to post cloud listing", "error");
-                    });
-                } else {
-                    const localListing = {
-                        id: newListing.id,
-                        title,
-                        price,
-                        category,
-                        condition,
-                        description,
-                        sellerName: this.currentUser.name,
-                        sellerEmail: this.currentUser.email,
-                        image: chosenImage,
-                        timestamp: "Just now"
-                    };
-                    listings.unshift(localListing);
-                    localStorage.setItem('cl_listings', JSON.stringify(listings));
-
-                    this.showToast("Your item has been posted on the marketplace!", "success");
-                    postForm.reset();
-                    
-                    const dz = document.getElementById('drop-zone');
-                    if (dz) {
-                        const p = dz.querySelector('p');
-                        p.textContent = "Drag & drop or click to upload";
-                        p.style.color = 'var(--text-main)';
                     }
-
-                    this.navigate('browse');
-                }
+                });
             });
         }
 
