@@ -549,6 +549,9 @@ const app = {
         const overlay = document.getElementById(modalId);
         if (overlay) {
             overlay.classList.add('active');
+            if (modalId === 'new-chat-modal') {
+                this.populateNewChatStudents();
+            }
         }
     },
 
@@ -557,6 +560,73 @@ const app = {
         if (overlay) {
             overlay.classList.remove('active');
         }
+    },
+
+    populateNewChatStudents() {
+        const select = document.getElementById('new-chat-select');
+        if (!select) return;
+
+        const users = JSON.parse(localStorage.getItem('cl_users')) || [];
+        const currentEmail = this.currentUser.email;
+
+        select.innerHTML = '<option value="" disabled selected>Choose a student...</option>';
+        
+        // Add VVCE AI Assistant option
+        const aiOpt = document.createElement('option');
+        aiOpt.value = 'campuslink_ai';
+        aiOpt.textContent = '🤖 CampusLink AI Assistant';
+        select.appendChild(aiOpt);
+
+        users.forEach(u => {
+            if (u.email !== currentEmail) {
+                const opt = document.createElement('option');
+                opt.value = u.email;
+                opt.textContent = `${u.name} (${u.branch} | Sem ${u.semester})`;
+                select.appendChild(opt);
+            }
+        });
+    },
+
+    startNewChatFromModal() {
+        const select = document.getElementById('new-chat-select');
+        if (!select) return;
+
+        const selectedEmail = select.value;
+        if (!selectedEmail) {
+            this.showToast("Please select a student to chat with!", "error");
+            return;
+        }
+
+        // Initialize thread in local storage if it doesn't exist
+        const buyerInboxKey = `cl_messages_${this.currentUser.email}`;
+        let buyerInbox = JSON.parse(localStorage.getItem(buyerInboxKey)) || {};
+
+        if (!buyerInbox[selectedEmail]) {
+            buyerInbox[selectedEmail] = [];
+            // Add a warm initial greeting message
+            if (selectedEmail === 'campuslink_ai') {
+                buyerInbox[selectedEmail].push({
+                    sender: 'campuslink_ai',
+                    text: 'Hello! I am your virtual campus negotiator assistant. Ask me about any marketplace listing, how to negotiate prices, or secure meeting locations near the VVCE library!',
+                    timestamp: 'Just now',
+                    unread: false
+                });
+            } else {
+                const users = JSON.parse(localStorage.getItem('cl_users')) || [];
+                const student = users.find(u => u.email === selectedEmail);
+                buyerInbox[selectedEmail].push({
+                    sender: selectedEmail,
+                    text: `Hey there! I'm ${student ? student.name.split(' ')[0] : 'a student'} from VVCE. Let's chat!`,
+                    timestamp: 'Just now',
+                    unread: true
+                });
+            }
+            localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
+        }
+
+        this.closeModal('new-chat-modal');
+        this.selectChatThread(selectedEmail);
+        this.showToast("Conversation started!", "success");
     },
 
     // Dropdown Toggles

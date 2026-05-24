@@ -489,8 +489,11 @@
                     <div class="chat-container">
                         <!-- Chat Sidebar -->
                         <aside class="chat-sidebar" id="chat-sidebar">
-                            <div class="chat-sidebar-header">
-                                <h4>Conversations</h4>
+                            <div class="chat-sidebar-header" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 1rem 1.25rem;">
+                                <h4 style="margin: 0; font-size: 1.1rem;">Conversations</h4>
+                                <button class="btn btn-primary btn-sm" onclick="app.openModal('new-chat-modal')" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 4px; font-weight: 700;">
+                                    <i data-lucide="plus" style="width: 14px; height: 14px;"></i> New Chat
+                                </button>
                             </div>
                             <div class="chat-thread-list" id="chat-thread-list">
                                 <!-- Injected dynamically via JS -->
@@ -878,6 +881,31 @@
                 <p class="text-muted mb-4" style="font-size:0.875rem; line-height:1.4;">Select a VVCE student account to switch sessions instantly. Test user-to-user marketplace deals, hackathon registrations, and subreddit chats!</p>
                 <div id="switch-user-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Chat Modal -->
+    <div id="new-chat-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 style="display:flex; align-items:center; gap:0.5rem;"><i data-lucide="message-square" style="width:20px; height:20px; color:var(--accent-yellow);"></i> Start Conversation</h3>
+                <button class="modal-close-btn" onclick="app.closeModal('new-chat-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <p class="text-muted mb-4" style="font-size:0.875rem; line-height:1.4;">Select any fellow VVCE student to start a direct message thread instantly.</p>
+                <div class="form-group">
+                    <label for="new-chat-select" style="display:block; margin-bottom:0.50rem; font-size:0.85rem; color:var(--text-muted);">Choose a Student</label>
+                    <select id="new-chat-select" class="form-control" required style="width:100%; display:block; padding:10px; border-radius:6px; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; outline:none; font-family:inherit;">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-actions mt-4" style="display:flex; gap:0.75rem; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('new-chat-modal')" style="flex:1;">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="app.startNewChatFromModal()" style="flex:2; font-weight:700;">Start Chat</button>
                 </div>
             </div>
         </div>
