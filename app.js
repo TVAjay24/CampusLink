@@ -10,8 +10,8 @@
  * If left empty, the application will seamlessly fall back to local localStorage database mode.
  */
 const supabaseConfig = {
-    url: "https://guzxcmrcngvaahcrjbrs.supabase.co",
-    anonKey: "sb_publishable_zispv_t6jezhzOpmnfsVlg_n7KG84eH"
+    url: "https://bakyxnrubwmtfzngootu.supabase.co",
+    anonKey: "sb_publishable_EUcYDwNC3AIc-TAWNBnyMA_JDQ2-w51"
 };
 
 // Initialize Supabase dynamically if keys are configured
@@ -34,6 +34,7 @@ const app = {
     currentUser: null,
     currentUserWishlist: [],
     currentListingsCache: [],
+    currentOffersCache: [],
     currentTeamsCache: [],
     currentRedditPostsCache: [],
     activeChatEmail: null,
@@ -81,6 +82,18 @@ const app = {
                     this.renderAnonymousUI();
                 }
             });
+
+            // Subscribe to realtime offers changes
+            try {
+                supabaseClient.channel('public:offers')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'offers' }, payload => {
+                        console.log('Realtime offers update received:', payload);
+                        this.renderProducts();
+                    })
+                    .subscribe();
+            } catch (err) {
+                console.error("Failed to subscribe to realtime offers channel:", err);
+            }
         } else {
             this.checkAuthSession();
         }
@@ -437,21 +450,28 @@ const app = {
             ];
             localStorage.setItem('cl_reddit_comments_3', JSON.stringify(mockComments));
         }
+
+        // Mock Negotiation Offers
+        if (!localStorage.getItem('cl_offers')) {
+            const mockOffers = [
+                {
+                    id: 1001,
+                    item_id: 2,
+                    buyer_id: "rahul@vvce.ac.in",
+                    buyer_name: "Rahul Sharma",
+                    seller_id: "priya@vvce.ac.in",
+                    proposed_price: 500,
+                    status: "pending",
+                    created_at: new Date().toISOString()
+                }
+            ];
+            localStorage.setItem('cl_offers', JSON.stringify(mockOffers));
+        }
     },
 
     // 2. SESSION & SECURITY GUARD
     checkAuthSession() {
-        let storedUser = localStorage.getItem('cl_current_user');
-        
-        // Auto-login Suresh Gowda on first run for perfect image-matching display!
-        if (!storedUser && !sessionStorage.getItem('cl_logged_out_once')) {
-            const users = JSON.parse(localStorage.getItem('cl_users')) || [];
-            const suresh = users.find(u => u.email === 'suresh@vvce.ac.in');
-            if (suresh) {
-                localStorage.setItem('cl_current_user', JSON.stringify(suresh));
-                storedUser = JSON.stringify(suresh);
-            }
-        }
+        const storedUser = localStorage.getItem('cl_current_user');
 
         if (storedUser) {
             this.currentUser = JSON.parse(storedUser);
@@ -731,28 +751,55 @@ const app = {
         const grid = document.getElementById('products-grid');
         if (!grid) return;
 
-        if (this.isSupabaseEnabled()) {
-            supabaseClient.from("wishlists").select("*").eq("email", this.currentUser.email).maybeSingle().then(({ data: wishlistDoc, error: wishErr }) => {
-                if (wishErr) throw wishErr;
-                this.currentUserWishlist = wishlistDoc ? (wishlistDoc.product_ids || []) : [];
-                return supabaseClient.from("listings").select("*").order("created_at", { ascending: false });
-            }).then(({ data: listingsData, error: listErr }) => {
-                if (listErr) throw listErr;
-                const listings = (listingsData || []).map(item => ({
-                    ...item,
-                    sellerName: item.seller_name,
-                    sellerEmail: item.seller_email
-                }));
-                this.currentListingsCache = listings;
+        // Show premium shimmer loader placeholders
+        grid.innerHTML = `
+            <div class="skeleton-loader-offers" style="grid-column: 1 / -1; height: 160px; margin-bottom: 1rem; border-radius:var(--radius-lg);"></div>
+            <div class="skeleton-loader-offers" style="grid-column: 1 / -1; height: 160px; border-radius:var(--radius-lg);"></div>
+        `;
+
+        this.fetchOffers().then(() => {
+            if (this.isSupabaseEnabled()) {
+                supabaseClient.from("wishlists").select("*").eq("email", this.currentUser.email).maybeSingle().then(({ data: wishlistDoc, error: wishErr }) => {
+                    if (wishErr) throw wishErr;
+                    this.currentUserWishlist = wishlistDoc ? (wishlistDoc.product_ids || []) : [];
+                    return supabaseClient.from("listings").select("*").order("created_at", { ascending: false });
+                }).then(({ data: listingsData, error: listErr }) => {
+                    if (listErr) throw listErr;
+                    const listings = (listingsData || []).map(item => ({
+                        ...item,
+                        sellerName: item.seller_name,
+                        sellerEmail: item.seller_email
+                    }));
+                    this.currentListingsCache = listings;
+                    this.renderListingsToContainer(listings, grid);
+                    
+                    // Refresh active chat viewport if currently open
+                    if (this.currentView === 'chat' && this.activeChatEmail) {
+                        this.selectChatThread(this.activeChatEmail);
+                    }
+                }).catch((err) => {
+                    console.error("Failed to load cloud listings & wishlist:", err);
+                    this.showToast("Failed to load cloud listings", "error");
+                });
+            } else {
+                const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
                 this.renderListingsToContainer(listings, grid);
-            }).catch((err) => {
-                console.error("Failed to load cloud listings & wishlist:", err);
-                this.showToast("Failed to load cloud listings", "error");
-            });
-        } else {
+                
+                // Refresh active chat viewport if currently open
+                if (this.currentView === 'chat' && this.activeChatEmail) {
+                    this.selectChatThread(this.activeChatEmail);
+                }
+            }
+        }).catch(err => {
+            console.error("Failed to fetch offers:", err);
             const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
             this.renderListingsToContainer(listings, grid);
-        }
+            
+            // Refresh active chat viewport if currently open
+            if (this.currentView === 'chat' && this.activeChatEmail) {
+                this.selectChatThread(this.activeChatEmail);
+            }
+        });
     },
 
     renderListingsToContainer(dataList, containerNode, isProfilePane = false) {
@@ -774,6 +821,9 @@ const app = {
             (JSON.parse(localStorage.getItem(`cl_wishlist_${this.currentUser.email}`)) || []);
 
         dataList.forEach(product => {
+            const sellerEmail = product.sellerEmail || product.seller_email;
+            const sellerName = product.sellerName || product.seller_name || "VVCE Student";
+
             const card = document.createElement('div');
             card.className = 'product-card glass-panel';
             
@@ -781,10 +831,22 @@ const app = {
             const isLiked = wishlist.includes(product.id);
             const heartClass = isLiked ? 'active' : '';
 
-            const isOwner = product.sellerEmail === this.currentUser.email;
+            const isOwner = sellerEmail === this.currentUser.email;
+
+            // Check if there is an accepted offer for this item
+            const acceptedOffer = (this.currentOffersCache || []).find(o => o.item_id === product.id && o.status === 'accepted');
+            const isSold = !!acceptedOffer;
 
             let cardActions = '';
-            if (isOwner) {
+            if (isSold) {
+                cardActions = `
+                    <div style="display: flex; justify-content: center; width: 100%; margin-top: 0.75rem;">
+                        <span class="product-badge-sold">
+                            <i data-lucide="check-circle" style="width: 12px; height: 12px; color: var(--accent-yellow);"></i> Sold - Negotiated (₹${acceptedOffer.proposed_price})
+                        </span>
+                    </div>
+                `;
+            } else if (isOwner) {
                 cardActions = `
                     <div class="product-owner-actions">
                         <button class="btn btn-secondary owner-btn" onclick="app.openEditListing(${product.id})">
@@ -797,15 +859,46 @@ const app = {
                 `;
             } else {
                 cardActions = `
-                    <div class="product-actions-btn-group" style="display: flex; gap: 0.5rem; width: 100%;">
-                        <button class="btn btn-primary product-action-btn" onclick="app.buyContactItem(${product.id})" style="flex: 1;">
-                            <i data-lucide="message-square" style="width: 14px; height: 14px;"></i> Buy / Contact
-                        </button>
-                        <button class="btn btn-secondary product-action-btn ai-chat-btn" onclick="app.chatWithAiAboutListing(${product.id})" style="padding: 0.5rem 0.85rem; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.1); color: #818cf8; width: auto;" title="Chat with AI Assistant">
+                    <div class="product-actions-btn-group" style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+                        <div style="display: flex; gap: 0.5rem; width: 100%;">
+                            <button class="btn btn-primary product-action-btn" onclick="app.buyContactItem(${product.id})" style="flex: 1;">
+                                <i data-lucide="message-square" style="width: 14px; height: 14px;"></i> Buy / Contact
+                            </button>
+                            <button class="btn btn-secondary product-action-btn" onclick="app.openNegotiateModal(${product.id})" style="flex: 1; border-color: rgba(245, 200, 66, 0.4); background: rgba(245, 200, 66, 0.1); color: var(--accent-yellow);">
+                                <i data-lucide="percent" style="width: 14px; height: 14px;"></i> Negotiate
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary product-action-btn ai-chat-btn" onclick="app.chatWithAiAboutListing(${product.id})" style="width: 100%; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.1); color: #818cf8;" title="Chat with AI Assistant">
                             <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Ask AI
                         </button>
                     </div>
                 `;
+            }
+
+            let pendingOffersHtml = '';
+            if (isOwner && !isSold) {
+                const itemOffers = (this.currentOffersCache || []).filter(o => o.item_id === product.id && o.status === 'pending');
+                if (itemOffers.length > 0) {
+                    pendingOffersHtml = `
+                        <div class="product-pending-offers-list">
+                            <div class="offer-header-title">Pending Offers</div>
+                    `;
+                    itemOffers.forEach(offer => {
+                        pendingOffersHtml += `
+                            <div class="offer-row-card">
+                                <div style="display:flex; flex-direction:column; gap:2px; text-align:left;">
+                                    <span style="font-weight:700; color:var(--text-main); font-size:0.8rem;">${offer.buyer_name}</span>
+                                    <span style="color:var(--accent-yellow); font-weight:800; font-size:0.85rem;">₹${offer.proposed_price}</span>
+                                </div>
+                                <div class="offer-buttons-pills">
+                                    <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer(${offer.id}, ${product.id})">Accept</button>
+                                    <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer(${offer.id})">Decline</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    pendingOffersHtml += `</div>`;
+                }
             }
 
             const placeholderImg = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=600";
@@ -826,11 +919,12 @@ const app = {
                     <div class="product-meta">
                         <div class="seller-info">
                             <i data-lucide="user" style="width: 14px; height: 14px;"></i>
-                            <span>${product.sellerName}</span>
+                            <span>${sellerName}</span>
                         </div>
                         <span class="text-sm">${product.timestamp}</span>
                     </div>
                     ${cardActions}
+                    ${pendingOffersHtml}
                 </div>
             `;
             containerNode.appendChild(card);
@@ -859,9 +953,9 @@ const app = {
 
         // Filter Logic
         let filtered = listings.filter(item => {
-            const matchesSearch = item.title.toLowerCase().includes(searchVal) || 
-                                  item.description.toLowerCase().includes(searchVal) ||
-                                  item.category.toLowerCase().includes(searchVal);
+            const matchesSearch = (item.title || '').toLowerCase().includes(searchVal) || 
+                                  (item.description || '').toLowerCase().includes(searchVal) ||
+                                  (item.category || '').toLowerCase().includes(searchVal);
             
             const matchesCategory = (categoryVal === 'all') || (item.category === categoryVal);
             
@@ -994,8 +1088,8 @@ const app = {
         const product = listings.find(p => p.id === productId);
         if (!product) return;
 
-        const sellerEmail = product.sellerEmail;
-        const sellerName = product.sellerName;
+        const sellerEmail = product.sellerEmail || product.seller_email;
+        const sellerName = product.sellerName || product.seller_name || "VVCE Student";
         
         if (sellerEmail === this.currentUser.email) {
             this.showToast("You cannot purchase your own item!", "error");
@@ -1103,11 +1197,11 @@ const app = {
                 card.className = 'feature-card glass-panel team-card';
                 
                 // Skill tags
-                const skillsArr = team.skills.split(',').map(s => s.trim());
+                const skillsArr = (team.skills || 'General').split(',').map(s => s.trim()).filter(Boolean);
                 let skillsBadges = skillsArr.map(s => `<span class="tag-badge skill">${s}</span>`).join('');
 
                 // Open Roles tags
-                const rolesArr = team.openRoles.split(',').map(r => r.trim());
+                const rolesArr = (team.openRoles || 'Open').split(',').map(r => r.trim()).filter(Boolean);
                 let rolesBadges = rolesArr.map(r => `<span class="tag-badge role">${r}</span>`).join('');
 
                 const isOwner = team.createdByEmail === this.currentUser.email;
@@ -1118,7 +1212,15 @@ const app = {
                 if (isOwner) {
                     const count = appliedList.length;
                     const badgeStr = count > 0 ? ` <span class="badge-count" style="margin-left:5px;">${count}</span>` : '';
-                    actionBtn = `<button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; margin-top: auto;">Manage${badgeStr}</button>`;
+                    actionBtn = `
+                        <div style="display:flex; gap:0.5rem; margin-top:auto;">
+                            <button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="flex:1;">Manage${badgeStr}</button>
+                            <button class="btn" onclick="app.deleteTeam(${team.id})" title="Delete Team"
+                                style="background:rgba(255,80,80,0.15); color:#ff5050; border:1px solid rgba(255,80,80,0.4); padding:0 0.75rem; border-radius:8px; cursor:pointer; transition:all 0.2s;"
+                                onmouseover="this.style.background='rgba(255,80,80,0.3)'" onmouseout="this.style.background='rgba(255,80,80,0.15)'">
+                                <i data-lucide="trash-2" style="width:15px; height:15px;"></i>
+                            </button>
+                        </div>`;
                 } else if (hasApplied) {
                     actionBtn = `<button class="btn btn-secondary" style="width:100%; margin-top: auto;" disabled>Application Sent</button>`;
                 } else {
@@ -1309,6 +1411,56 @@ const app = {
 
         if (window.lucide) lucide.createIcons();
         this.openModal('manage-applicants-modal');
+    },
+
+    deleteTeam(teamId) {
+        const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
+        const team = teams.find(t => t.id === teamId);
+        if (!team) return;
+
+        // Safety: only owner can delete
+        if (team.createdByEmail !== this.currentUser.email) {
+            this.showToast("You can only delete teams you created.", "error");
+            return;
+        }
+
+        // Populate confirmation modal
+        document.getElementById('delete-team-name-label').textContent = `"${team.teamName}"`;
+        document.getElementById('delete-team-id-input').value = teamId;
+        if (window.lucide) lucide.createIcons();
+        this.openModal('delete-team-modal');
+    },
+
+    confirmDeleteTeam() {
+        const teamId = document.getElementById('delete-team-id-input').value;
+        if (!teamId) return;
+
+        // Disable button while deleting
+        const btn = document.getElementById('confirm-delete-team-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from("teams").delete().eq("id", teamId).then(({ error }) => {
+                if (error) throw error;
+                this.closeModal('delete-team-modal');
+                this.showToast("Team deleted successfully.", "success");
+                this.renderTeams();
+            }).catch((err) => {
+                console.error("Failed to delete team from Supabase:", err);
+                this.showToast("Failed to delete team. Please try again.", "error");
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i data-lucide="trash-2" style="width:14px;height:14px;"></i> Yes, Delete'; }
+                if (window.lucide) lucide.createIcons();
+            });
+        } else {
+            let teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+            // Convert to number for comparison (local IDs are numbers)
+            teams = teams.filter(t => String(t.id) !== String(teamId));
+            localStorage.setItem('cl_teams', JSON.stringify(teams));
+            this.currentTeamsCache = teams;
+            this.closeModal('delete-team-modal');
+            this.showToast("Team deleted successfully.", "success");
+            this.renderTeams();
+        }
     },
 
     // 7. HACKATHONS PAGE
@@ -2109,6 +2261,11 @@ const app = {
                     inbox["campuslink_ai"] = [];
                 }
 
+                // Load all local storage mock conversations so mock threads are visible
+                Object.keys(localInbox).forEach(peer => {
+                    inbox[peer] = localInbox[peer] || [];
+                });
+
                 chatDocs.forEach(chat => {
                     const peer = chat.user_a === this.currentUser.email ? chat.user_b : chat.user_a;
                     inbox[peer] = chat.messages || [];
@@ -2116,7 +2273,10 @@ const app = {
 
                 this.renderSidebarWithInbox(inbox);
             }).catch(err => {
-                console.error("Failed to load chat threads in sidebar:", err);
+                console.error("Failed to load chat threads in sidebar, falling back to local:", err);
+                const inboxKey = `cl_messages_${this.currentUser.email}`;
+                const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+                this.renderSidebarWithInbox(inbox);
             });
         } else {
             const inboxKey = `cl_messages_${this.currentUser.email}`;
@@ -2247,8 +2407,16 @@ const app = {
     },
 
     renderChatPaneWithMessages(messages) {
+        console.group("Checkpoint 5: renderChatPaneWithMessages Triggered");
         const viewport = document.getElementById('chat-messages-viewport');
-        if (!viewport) return;
+        console.log("Target Viewport Container found:", viewport);
+        console.log("Messages Array size for rendering:", messages?.length);
+        console.groupEnd();
+
+        if (!viewport) {
+            console.error("Checkpoint 5 ERROR: 'chat-messages-viewport' DOM element not found!");
+            return;
+        }
         viewport.innerHTML = '';
 
         messages.forEach(msg => {
@@ -2256,8 +2424,25 @@ const app = {
             const isMe = msg.sender === this.currentUser.email;
             bubble.className = `chat-bubble ${isMe ? 'sent' : 'received'}`;
             
+            let actionButtonsHtml = '';
+            if (msg.text.includes("🚨 Price Proposal:") && !isMe) {
+                const offer = (this.currentOffersCache || []).find(o => 
+                    o.buyer_id === msg.sender && 
+                    o.status === 'pending'
+                );
+                if (offer) {
+                    actionButtonsHtml = `
+                        <div class="offer-buttons-pills" style="margin-top: 0.5rem; justify-content: flex-end;">
+                            <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer(${offer.id}, ${offer.item_id})" style="padding: 4px 10px; font-size: 0.75rem;">Accept</button>
+                            <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer(${offer.id})" style="padding: 4px 10px; font-size: 0.75rem;">Decline</button>
+                        </div>
+                    `;
+                }
+            }
+
             bubble.innerHTML = `
                 <div>${msg.text}</div>
+                ${actionButtonsHtml}
                 <div class="chat-bubble-time">${msg.timestamp}</div>
             `;
             viewport.appendChild(bubble);
@@ -2277,7 +2462,15 @@ const app = {
 
     selectChatThread(email) {
         this.activeChatEmail = email;
+        this.renderChatSidebar(); // Update sidebar active state and list immediately!
+        this.renderChatPane(); // Show chat pane container immediately!
         
+        console.group("Checkpoint 1: selectChatThread Triggered");
+        console.log("Current Logged-in User:", this.currentUser?.email);
+        console.log("Chat Recipient selected:", email);
+        console.log("[Sequence 1] selectChatThread initialized");
+        console.groupEnd();
+
         // Unsubscribe from previous channel if any
         if (this.activeChatChannel) {
             supabaseClient.removeChannel(this.activeChatChannel);
@@ -2290,14 +2483,31 @@ const app = {
 
         if (this.isSupabaseEnabled() && !isAi) {
             const roomId = this.getChatRoomId(this.currentUser.email, email);
+            console.log("[Sequence 2] Starting Supabase async fetch for Room:", roomId);
             
             // Fetch messages once initially
             supabaseClient.from("chats").select("*").eq("room_id", roomId).maybeSingle().then(({ data: chatDoc, error }) => {
+                console.group("Checkpoint 2: Supabase Query Response Resolved");
+                console.log("[Sequence 3] Database fetch promise resolved");
+                console.log("Error Object:", error);
+                console.log("Returned data row:", chatDoc);
+                console.groupEnd();
+
                 if (error) throw error;
                 let messages = [];
 
                 if (chatDoc) {
                     messages = chatDoc.messages || [];
+                    
+                    // Merge local offline test messages
+                    const inboxKey = `cl_messages_${this.currentUser.email}`;
+                    const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+                    const localMsgs = inbox[email] || [];
+                    localMsgs.forEach(lm => {
+                        if (!messages.some(cm => cm.text === lm.text && cm.sender === lm.sender)) {
+                            messages.push(lm);
+                        }
+                    });
                     
                     // Mark peer's messages as read
                     let updated = false;
@@ -2312,21 +2522,41 @@ const app = {
                     if (updated) {
                         supabaseClient.from("chats").update({
                             messages: updatedMessages
-                        }).eq("room_id", roomId).catch(err => console.error("Failed to update unread status:", err));
+                        }).eq("room_id", roomId).then(({ error }) => {
+                            if (error) console.error("Failed to update unread status:", error);
+                        });
                     }
                 } else {
-                    // Create the chat document if it doesn't exist
+                    console.log("Checkpoint 2b: Room document doesn't exist in Supabase yet. Initializing with local mock messages...");
+                    // Create the chat document and seed it with local mock messages if they exist!
+                    const inboxKey = `cl_messages_${this.currentUser.email}`;
+                    const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+                    const localMsgs = inbox[email] || [];
+                    
+                    messages = localMsgs;
+                    
                     supabaseClient.from("chats").insert({
                         room_id: roomId,
                         user_a: this.currentUser.email,
                         user_b: email,
-                        messages: []
+                        messages: localMsgs
                     }).catch(err => console.error("Failed to create room doc:", err));
                 }
 
+                console.log("[Sequence 4] Rendering chat pane bubbles with messages count:", messages.length);
                 this.renderChatPaneWithMessages(messages);
             }).catch((err) => {
-                console.error("Failed to load chat thread:", err);
+                console.group("Checkpoint 3: Supabase Load Error Fallback");
+                console.error("Failed to load chat thread from Supabase:", err);
+                console.log("Initiating automatic client-side local storage fallback...");
+                console.groupEnd();
+
+                const inboxKey = `cl_messages_${this.currentUser.email}`;
+                const inbox = JSON.parse(localStorage.getItem(inboxKey)) || {};
+                const messages = inbox[email] || [];
+                
+                console.log("[Sequence 4 Fallback] Rendering local messages count:", messages.length);
+                this.renderChatPaneWithMessages(messages);
             });
 
             // Set up real-time channel subscription
@@ -2334,7 +2564,7 @@ const app = {
                 .channel(`room_${roomId}`)
                 .on(
                     'postgres_changes',
-                    { event: 'UPDATE', schema: 'public', table: 'chats', filter: `room_id=eq.${roomId}` },
+                    { event: '*', schema: 'public', table: 'chats', filter: `room_id=eq.${roomId}` },
                     (payload) => {
                         const messages = payload.new.messages || [];
                         this.renderChatPaneWithMessages(messages);
@@ -2444,6 +2674,12 @@ const app = {
                 const email = emailInput.value.trim().toLowerCase();
                 const password = passwordInput.value.trim();
 
+                // VVCE domain validation
+                if (!email.endsWith('@vvce.ac.in')) {
+                    this.showToast('Only @vvce.ac.in email addresses are allowed.', 'error');
+                    return;
+                }
+
                 // Loading visual
                 btn.classList.add('loading');
                 btn.disabled = true;
@@ -2494,6 +2730,12 @@ const app = {
                 const phone = document.getElementById('signup-phone').value.trim();
                 const password = document.getElementById('signup-password').value.trim();
                 const btn = document.getElementById('signup-submit-btn');
+
+                // VVCE domain validation
+                if (!email.endsWith('@vvce.ac.in')) {
+                    this.showToast('Only @vvce.ac.in email addresses are allowed.', 'error');
+                    return;
+                }
 
                 btn.classList.add('loading');
                 btn.disabled = true;
@@ -3025,14 +3267,43 @@ const app = {
                         if (error) throw error;
                         const messages = data ? (data.messages || []) : [];
                         messages.push(cloudMsg);
-                        return supabaseClient.from("chats").update({ messages }).eq("room_id", roomId);
+                        
+                        // Optimistic rendering: Show message on screen immediately!
+                        this.renderChatPaneWithMessages(messages);
+                        
+                        // Use upsert to handle new chat rooms seamlessly
+                        return supabaseClient.from("chats").upsert({
+                            room_id: roomId,
+                            user_a: this.currentUser.email,
+                            user_b: this.activeChatEmail,
+                            messages: messages
+                        });
                     }).then(({ error }) => {
                         if (error) throw error;
                         input.value = '';
                         input.focus();
                     }).catch((err) => {
-                        console.error("Failed to send Supabase message:", err);
-                        this.showToast("Failed to send message", "error");
+                        console.error("Failed to send Supabase message, falling back to local storage:", err);
+                        
+                        // Local storage fallback
+                        const localMsg = { ...cloudMsg, timestamp: "Just now", unread: false };
+                        const recipientMsg = { ...localMsg, unread: true };
+                        const sellerInboxKey = `cl_messages_${this.activeChatEmail}`;
+                        let sellerInbox = JSON.parse(localStorage.getItem(sellerInboxKey)) || {};
+
+                        if (!buyerInbox[this.activeChatEmail]) buyerInbox[this.activeChatEmail] = [];
+                        if (!sellerInbox[this.currentUser.email]) sellerInbox[this.currentUser.email] = [];
+
+                        buyerInbox[this.activeChatEmail].push(localMsg);
+                        sellerInbox[this.currentUser.email].push(recipientMsg);
+
+                        localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
+                        localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
+
+                        input.value = '';
+                        input.focus();
+                        this.renderChatPane();
+                        this.renderChatSidebar();
                     });
                 } else {
                     // Standard message to real student
@@ -3160,6 +3431,15 @@ const app = {
             }
             origOpenModal.call(this, modalId);
         };
+
+        // Price Negotiation Form Submit
+        const negotiateForm = document.getElementById('negotiate-offer-form');
+        if (negotiateForm) {
+            negotiateForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitNegotiateOffer(e);
+            });
+        }
     },
 
     toggleMobileMenu() {
@@ -3169,26 +3449,26 @@ const app = {
 
     logout() {
         sessionStorage.setItem('cl_logged_out_once', 'true');
+        // Immediately hide the authenticated UI
+        this.currentUser = null;
+        this.activeChatEmail = null;
+        this.currentView = 'home';
         if (this.isSupabaseEnabled()) {
             if (this.activeChatChannel) {
                 supabaseClient.removeChannel(this.activeChatChannel);
                 this.activeChatChannel = null;
             }
+            // Show anonymous UI immediately before the async signOut completes
+            this.renderAnonymousUI();
             supabaseClient.auth.signOut().then(() => {
-                this.currentUser = null;
-                this.activeChatEmail = null;
-                this.currentView = 'home';
                 this.showToast("Logged out successfully!", "info");
             }).catch((err) => {
                 console.error("Sign out failed:", err);
             });
         } else {
             localStorage.removeItem('cl_current_user');
-            this.currentUser = null;
-            this.activeChatEmail = null;
-            this.currentView = 'home';
             this.showToast("Logged out successfully!", "info");
-            this.checkAuthSession();
+            this.renderAnonymousUI();
         }
     },
 
@@ -3428,6 +3708,304 @@ const app = {
         
         // Refresh application state
         this.checkAuthSession();
+    },
+
+    fetchOffers() {
+        const localOffers = JSON.parse(localStorage.getItem('cl_offers')) || [];
+        if (this.isSupabaseEnabled()) {
+            return supabaseClient
+                .from('offers')
+                .select('*')
+                .then(({ data, error }) => {
+                    if (error) {
+                        console.error("Error fetching cloud offers:", error);
+                        return localOffers;
+                    }
+                    const cloudOffers = data || [];
+                    const merged = [...localOffers];
+                    cloudOffers.forEach(co => {
+                        if (!merged.some(lo => lo.id === co.id)) {
+                            merged.push(co);
+                        }
+                    });
+                    return merged;
+                })
+                .then(offers => {
+                    this.currentOffersCache = offers;
+                    return offers;
+                });
+        } else {
+            this.currentOffersCache = localOffers;
+            return Promise.resolve(localOffers);
+        }
+    },
+
+    openNegotiateModal(productId) {
+        const listings = this.currentListingsCache.length > 0 ? 
+            this.currentListingsCache : 
+            (JSON.parse(localStorage.getItem('cl_listings')) || []);
+        const product = listings.find(p => p.id === productId);
+        if (!product) {
+            this.showToast("Item not found", "error");
+            return;
+        }
+
+        document.getElementById('negotiate-item-id').value = product.id;
+        document.getElementById('negotiate-seller-email').value = product.sellerEmail || product.seller_email;
+        document.getElementById('negotiate-item-title').textContent = product.title;
+        document.getElementById('negotiate-asking-price').textContent = `₹${product.price.toLocaleString('en-IN')}`;
+        document.getElementById('negotiate-proposed-price').value = '';
+        
+        this.openModal('negotiate-modal');
+    },
+
+    submitNegotiateOffer(event) {
+        const itemId = parseInt(document.getElementById('negotiate-item-id').value);
+        const sellerEmail = document.getElementById('negotiate-seller-email').value;
+        const proposedPrice = parseFloat(document.getElementById('negotiate-proposed-price').value);
+
+        if (isNaN(proposedPrice) || proposedPrice <= 0) {
+            this.showToast("Please enter a valid price", "error");
+            return;
+        }
+
+        const newOffer = {
+            id: Date.now(),
+            item_id: itemId,
+            buyer_id: this.currentUser.email,
+            buyer_name: this.currentUser.name,
+            seller_id: sellerEmail,
+            proposed_price: proposedPrice,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
+
+        const itemTitle = document.getElementById('negotiate-item-title').textContent;
+        this.sendOfferChatMessage(newOffer.buyer_id, newOffer.seller_id, newOffer.proposed_price, itemTitle);
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient
+                .from('offers')
+                .insert({
+                    id: newOffer.id,
+                    item_id: newOffer.item_id,
+                    buyer_id: newOffer.buyer_id,
+                    buyer_name: newOffer.buyer_name,
+                    seller_id: newOffer.seller_id,
+                    proposed_price: newOffer.proposed_price,
+                    status: newOffer.status,
+                    created_at: newOffer.created_at
+                })
+                .then(({ error }) => {
+                    if (error) {
+                        console.error("Supabase insert offer failed, falling back to local:", error);
+                        this.saveOfferLocally(newOffer);
+                    } else {
+                        this.showToast("Offer sent successfully!", "success");
+                    }
+                    this.closeModal('negotiate-modal');
+                    this.renderProducts();
+                });
+        } else {
+            this.saveOfferLocally(newOffer);
+            this.showToast("Offer sent successfully!", "success");
+            this.closeModal('negotiate-modal');
+            this.renderProducts();
+        }
+    },
+
+    saveOfferLocally(offer) {
+        const offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
+        offers.push(offer);
+        localStorage.setItem('cl_offers', JSON.stringify(offers));
+    },
+
+    acceptNegotiationOffer(offerId, productId) {
+        const offer = (this.currentOffersCache || []).find(o => o.id === offerId) || 
+            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => o.id === offerId));
+        if (offer) {
+            const listings = this.currentListingsCache.length > 0 ? 
+                this.currentListingsCache : 
+                (JSON.parse(localStorage.getItem('cl_listings')) || []);
+            const listing = listings.find(p => p.id === productId);
+            if (listing) {
+                const acceptText = `✅ Offer Accepted: I have accepted your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${listing.title}".`;
+                this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, acceptText);
+            }
+        }
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient
+                .from('offers')
+                .update({ status: 'accepted' })
+                .eq('id', offerId)
+                .then(({ error }) => {
+                    if (error) throw error;
+                    return supabaseClient
+                        .from('offers')
+                        .update({ status: 'declined' })
+                        .eq('item_id', productId)
+                        .eq('status', 'pending')
+                        .neq('id', offerId);
+                })
+                .then(({ error }) => {
+                    if (error) console.error("Error auto-declining other offers:", error);
+                    this.showToast("Offer accepted! Item marked as Sold.", "success");
+                    this.renderProducts();
+                })
+                .catch(err => {
+                    console.error("Accept offer transaction failed:", err);
+                    this.showToast("Failed to accept offer online, trying locally...", "warning");
+                    this.acceptOfferLocally(offerId, productId);
+                });
+        } else {
+            this.acceptOfferLocally(offerId, productId);
+        }
+    },
+
+    acceptOfferLocally(offerId, productId) {
+        const offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
+        offers.forEach(o => {
+            if (o.id === offerId) {
+                o.status = 'accepted';
+            } else if (o.item_id === productId && o.status === 'pending') {
+                o.status = 'declined';
+            }
+        });
+        localStorage.setItem('cl_offers', JSON.stringify(offers));
+        this.showToast("Offer accepted! Item marked as Sold.", "success");
+        this.renderProducts();
+    },
+
+    declineNegotiationOffer(offerId) {
+        const offer = (this.currentOffersCache || []).find(o => o.id === offerId) || 
+            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => o.id === offerId));
+        if (offer) {
+            const listings = this.currentListingsCache.length > 0 ? 
+                this.currentListingsCache : 
+                (JSON.parse(localStorage.getItem('cl_listings')) || []);
+            const listing = listings.find(p => p.id === offer.item_id);
+            if (listing) {
+                const declineText = `❌ Offer Declined: I have declined your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${listing.title}".`;
+                this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, declineText);
+            }
+        }
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient
+                .from('offers')
+                .update({ status: 'declined' })
+                .eq('id', offerId)
+                .then(({ error }) => {
+                    if (error) throw error;
+                    this.showToast("Offer declined.", "info");
+                    this.renderProducts();
+                })
+                .catch(err => {
+                    console.error("Decline offer online failed:", err);
+                    this.declineOfferLocally(offerId);
+                });
+        } else {
+            this.declineOfferLocally(offerId);
+        }
+    },
+
+    declineOfferLocally(offerId) {
+        const offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
+        const target = offers.find(o => o.id === offerId);
+        if (target) {
+            target.status = 'declined';
+            localStorage.setItem('cl_offers', JSON.stringify(offers));
+            this.showToast("Offer declined.", "info");
+            this.renderProducts();
+        }
+    },
+
+    sendOfferChatMessage(buyerEmail, sellerEmail, proposedPrice, itemTitle) {
+        const text = `🚨 Price Proposal: I would like to make an offer of ₹${proposedPrice.toLocaleString('en-IN')} on your listing: "${itemTitle}".`;
+        
+        if (this.isSupabaseEnabled()) {
+            const roomId = this.getChatRoomId(buyerEmail, sellerEmail);
+            const cloudMsg = {
+                sender: buyerEmail,
+                text: text,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                unread: true
+            };
+
+            supabaseClient.from("chats").select("messages").eq("room_id", roomId).maybeSingle().then(({ data, error }) => {
+                if (error) throw error;
+                const messages = data ? (data.messages || []) : [];
+                messages.push(cloudMsg);
+                
+                return supabaseClient.from("chats").upsert({
+                    room_id: roomId,
+                    user_a: buyerEmail,
+                    user_b: sellerEmail,
+                    messages: messages
+                });
+            }).catch((err) => {
+                console.error("Offers chat message cloud write failed:", err);
+                this.sendOfferChatMessageLocally(buyerEmail, sellerEmail, text);
+            });
+        } else {
+            this.sendOfferChatMessageLocally(buyerEmail, sellerEmail, text);
+        }
+    },
+
+    sendSystemFeedbackChatMessage(senderEmail, recipientEmail, text) {
+        if (this.isSupabaseEnabled()) {
+            const roomId = this.getChatRoomId(senderEmail, recipientEmail);
+            const cloudMsg = {
+                sender: senderEmail,
+                text: text,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                unread: true
+            };
+
+            supabaseClient.from("chats").select("messages").eq("room_id", roomId).maybeSingle().then(({ data, error }) => {
+                if (error) throw error;
+                const messages = data ? (data.messages || []) : [];
+                messages.push(cloudMsg);
+                
+                return supabaseClient.from("chats").upsert({
+                    room_id: roomId,
+                    user_a: senderEmail,
+                    user_b: recipientEmail,
+                    messages: messages
+                });
+            }).catch(err => {
+                console.error("System feedback message online failed, running locally:", err);
+                this.sendOfferChatMessageLocally(senderEmail, recipientEmail, text);
+            });
+        } else {
+            this.sendOfferChatMessageLocally(senderEmail, recipientEmail, text);
+        }
+    },
+
+    sendOfferChatMessageLocally(buyerEmail, sellerEmail, text) {
+        const buyerInboxKey = `cl_messages_${buyerEmail}`;
+        const sellerInboxKey = `cl_messages_${sellerEmail}`;
+        
+        let buyerInbox = JSON.parse(localStorage.getItem(buyerInboxKey)) || {};
+        let sellerInbox = JSON.parse(localStorage.getItem(sellerInboxKey)) || {};
+
+        const msg = {
+            sender: buyerEmail,
+            text: text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            unread: false
+        };
+
+        if (!buyerInbox[sellerEmail]) buyerInbox[sellerEmail] = [];
+        buyerInbox[sellerEmail].push(msg);
+
+        const recipientMsg = { ...msg, unread: true };
+        if (!sellerInbox[buyerEmail]) sellerInbox[buyerEmail] = [];
+        sellerInbox[buyerEmail].push(recipientMsg);
+
+        localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
+        localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
     }
 };
 

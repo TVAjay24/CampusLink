@@ -1,9 +1,9 @@
-const CACHE_NAME = 'campuslink-v1';
+const CACHE_NAME = 'campuslink-v2';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
+  './styles.css?v=2.2',
+  './app.js?v=2.2',
   'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Syne:wght@400..800&display=swap',
   'https://unpkg.com/lucide@latest'
 ];

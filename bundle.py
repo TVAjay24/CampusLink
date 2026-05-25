@@ -2,7 +2,7 @@ import os
 
 def bundle():
     # Get absolute paths of the files
-    workspace_dir = r"d:\Antigravity\IDT"
+    workspace_dir = os.path.dirname(os.path.abspath(__file__))
     index_path = os.path.join(workspace_dir, "index.html")
     css_path = os.path.join(workspace_dir, "styles.css")
     js_path = os.path.join(workspace_dir, "app.js")

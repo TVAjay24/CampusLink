@@ -184,10 +184,22 @@ h1, h2, h3, h4 {
 .nav-links a {
     font-weight: 500;
     color: var(--text-muted);
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
 }
 
 .nav-links a:hover {
     color: var(--text-main);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.nav-links a.active {
+    color: #1a1a1a;
+    background: var(--accent, #f5c842);
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(245, 200, 66, 0.45);
 }
 
 .menu-toggle {
@@ -2476,4 +2488,87 @@ h1, h2, h3, h4 {
 @keyframes typing-bounce {
     0%, 100%, 80% { transform: translateY(0); }
     40% { transform: translateY(-4px); }
+}
+
+/* Negotiation & Offers Styling */
+.product-pending-offers-list {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.offer-header-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--accent-yellow);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+.offer-row-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+}
+.offer-buttons-pills {
+    display: flex;
+    gap: 0.35rem;
+}
+.btn-offer-action {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    transition: var(--transition);
+}
+.btn-offer-action.accept {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+.btn-offer-action.accept:hover {
+    background: #10b981;
+    color: #0e0f13;
+}
+.btn-offer-action.decline {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+}
+.btn-offer-action.decline:hover {
+    background: #ef4444;
+    color: #fff;
+}
+.product-badge-sold {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.2rem 0.60rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
+    background: rgba(245, 200, 66, 0.1);
+    color: var(--accent-yellow);
+    border: 1px solid rgba(245, 200, 66, 0.2);
+    box-shadow: 0 0 10px rgba(245, 200, 66, 0.08);
+}
+.skeleton-loader-offers {
+    height: 38px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%);
+    background-size: 200% 100%;
+    animation: loadingPulse 1.5s infinite;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+@keyframes loadingPulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
