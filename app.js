@@ -114,10 +114,31 @@ const app = {
                         ...data,
                         email: authUser.email // Enforce key
                     };
+
+                    // Auto-seed GitHub for the owner account if not yet set
+                    if (authUser.email === 'vvce25cse0197@vvce.ac.in') {
+                        supabaseClient.from('profiles')
+                            .select('github')
+                            .eq('email', authUser.email)
+                            .maybeSingle()
+                            .then(({ data: prof }) => {
+                                if (!prof || !prof.github) {
+                                    supabaseClient.from('profiles').upsert({
+                                        email: authUser.email,
+                                        github: 'TVAjay24',
+                                        bio: prof ? (prof.bio || '') : 'CSE student at VVCE. Building CampusLink.',
+                                        skills: prof ? (prof.skills || ['JavaScript','HTML','CSS','Supabase']) : ['JavaScript','HTML','CSS','Supabase'],
+                                        linkedin: prof ? (prof.linkedin || '') : ''
+                                    }).then(() => console.log('GitHub TVAjay24 linked to profile.'));
+                                }
+                            });
+                    }
+
                     this.renderAuthenticatedUI();
                 }
             });
     },
+
 
     renderAuthenticatedUI() {
         // Show main layout & elements
@@ -303,10 +324,24 @@ const app = {
                     defaultProfile = { bio: "Senior Computer Science student. Loves developing full stack mobile applications and hacking with web architectures.", skills: ["React Native", "Node.js", "MongoDB", "Figma"], github: "rahulsharma", linkedin: "rahul-placement" };
                 } else if (u.email === 'priya@vvce.ac.in') {
                     defaultProfile = { bio: "Information Science undergrad. Enthusiastic about embedded systems, smart devices, and Flutter development.", skills: ["ESP32", "C++", "Flutter", "TailwindCSS"], github: "priya-patel", linkedin: "priya-patel-dev" };
+                } else if (u.email === 'vvce25cse0197@vvce.ac.in') {
+                    defaultProfile = { bio: "CSE student at VVCE. Building CampusLink.", skills: ["JavaScript", "HTML", "CSS", "Supabase"], github: "TVAjay24", linkedin: "" };
                 }
                 localStorage.setItem(key, JSON.stringify(defaultProfile));
             }
         });
+
+        // Ensure real Supabase user profile has GitHub pre-set in localStorage cache
+        const realUserProfileKey = 'cl_profile_vvce25cse0197@vvce.ac.in';
+        if (!localStorage.getItem(realUserProfileKey)) {
+            localStorage.setItem(realUserProfileKey, JSON.stringify({
+                bio: "CSE student at VVCE. Building CampusLink.",
+                skills: ["JavaScript", "HTML", "CSS", "Supabase"],
+                github: "TVAjay24",
+                linkedin: ""
+            }));
+        }
+
 
         // Seed Hackathons
         if (!localStorage.getItem('cl_hackathons')) {
