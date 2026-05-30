@@ -2572,3 +2572,632 @@ h1, h2, h3, h4 {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* ==========================================================================
+   CAMPUSLINK — FULL RESPONSIVE SYSTEM
+   Mobile  : max-width: 767px
+   Tablet  : 768px – 1023px
+   Desktop : min-width: 1024px
+   ========================================================================== */
+
+/* ---- Global Base ---- */
+*, *::before, *::after { box-sizing: border-box; }
+img { max-width: 100%; height: auto; }
+body { overflow-x: hidden; }
+
+/* Touch targets: all interactive elements minimum 44x44px on mobile */
+@media (max-width: 767px) {
+    .btn, .nav-links a, .vote-arrow, .wishlist-btn,
+    .chat-thread-item, .filter-list label, .skill-chip,
+    .subreddit-item, .profile-tab-title, .reddit-action-btn {
+        min-height: 44px;
+    }
+    /* Inputs: min 16px prevents iOS auto-zoom */
+    input, select, textarea, .form-control {
+        font-size: 16px !important;
+    }
+    /* Modals must scroll if overflow */
+    .modal-content {
+        max-height: 92vh;
+        overflow-y: auto;
+        margin: 0.5rem;
+    }
+    body { font-size: 14px; }
+}
+
+/* =========================================
+   1. NAVBAR — Mobile Drawer
+   ========================================= */
+
+/* Drawer overlay */
+.nav-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    backdrop-filter: blur(2px);
+}
+.nav-drawer-overlay.open { display: block; }
+
+/* Left slide-in drawer */
+.nav-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 280px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border-color);
+    z-index: 201;
+    transform: translateX(-100%);
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
+}
+.nav-drawer.open { transform: translateX(0); }
+
+.nav-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-drawer-logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    font-family: 'Syne', sans-serif;
+}
+
+.nav-drawer-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    transition: background 0.2s;
+}
+.nav-drawer-close:hover { background: rgba(255,255,255,0.06); color: var(--text-main); }
+
+.nav-drawer-links {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 0;
+    gap: 0;
+}
+
+.nav-drawer-links a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1.5rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 1rem;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+    min-height: 52px;
+}
+.nav-drawer-links a:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
+.nav-drawer-links a.active {
+    color: var(--accent-yellow);
+    background: rgba(245,200,66,0.07);
+    border-left-color: var(--accent-yellow);
+}
+
+.nav-drawer-user {
+    margin-top: auto;
+    border-top: 1px solid var(--border-color);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+@media (max-width: 767px) {
+    /* Hide desktop nav links */
+    #main-nav-links { display: none !important; }
+
+    /* Show hamburger */
+    .menu-toggle {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        color: var(--text-main);
+        cursor: pointer;
+        order: -1;
+    }
+    .menu-toggle i { width: 22px; height: 22px; }
+
+    /* Compact navbar on mobile */
+    .navbar { padding: 0.75rem 0; }
+    .nav-container { gap: 0.5rem; }
+
+    /* Logo stays visible */
+    .logo { font-size: 1.2rem; }
+
+    /* User chip compact */
+    .user-chip-group-wrapper { padding: 0.2rem 0.4rem 0.2rem 0.35rem; }
+    #user-chip-name { display: none; }
+}
+
+/* =========================================
+   2. MARKETPLACE — Filter Bottom Sheet + FAB
+   ========================================= */
+
+/* Filter bottom-sheet trigger button (mobile only) */
+.filter-mobile-trigger {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+    min-height: 44px;
+}
+.filter-mobile-trigger:hover { background: rgba(255,255,255,0.1); border-color: rgba(245,200,66,0.3); }
+.filter-mobile-trigger i { width: 16px; height: 16px; }
+
+/* Filter bottom sheet */
+.filter-bottom-sheet-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 300;
+    backdrop-filter: blur(4px);
+}
+.filter-bottom-sheet-overlay.open { display: block; }
+
+.filter-bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    border-radius: 1.5rem 1.5rem 0 0;
+    z-index: 301;
+    padding: 1.5rem;
+    max-height: 85vh;
+    overflow-y: auto;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.filter-bottom-sheet.open { transform: translateY(0); }
+
+.filter-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    margin: 0 auto 1.25rem;
+}
+
+.filter-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.filter-sheet-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.4rem;
+    display: flex;
+    align-items: center;
+}
+
+/* FAB — Post Item */
+.post-item-fab {
+    display: none;
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 100;
+    width: 56px;
+    height: 56px;
+    background: var(--accent-yellow);
+    color: var(--text-dark);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(245,200,66,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+.post-item-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(245,200,66,0.6); }
+.post-item-fab i { width: 26px; height: 26px; }
+
+@media (max-width: 767px) {
+    /* Sidebar hidden, show filter trigger */
+    .layout-with-sidebar { grid-template-columns: 1fr; gap: 1rem; }
+    .sidebar { display: none !important; }
+    .filter-mobile-trigger { display: flex !important; }
+    
+    /* Show FAB */
+    .post-item-fab { display: flex !important; }
+
+    /* Toast moves up above FAB */
+    .toast-wrap { bottom: 5rem; }
+
+    /* Product grid: 1 column */
+    .products-grid { grid-template-columns: 1fr; gap: 1rem; }
+
+    /* Product image smaller on mobile */
+    .product-image-container { height: 180px; }
+
+    /* Action buttons stack vertically */
+    .product-actions-btn-group { flex-direction: column; gap: 0.5rem; }
+    .product-owner-actions { flex-direction: column; }
+    .offer-buttons-pills { flex-direction: column; gap: 0.4rem; }
+    .offer-row-card { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+
+    /* Search bar compact */
+    .search-bar input { font-size: 16px; }
+    
+    /* Mobile marketplace header with filter button */
+    .products-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .products-header-row {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .layout-with-sidebar { grid-template-columns: 240px 1fr; }
+    .products-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* =========================================
+   3. MESSAGES — Full-screen panel switching
+   ========================================= */
+
+@media (max-width: 767px) {
+    .chat-container {
+        display: block !important;
+        height: calc(100vh - 130px);
+        min-height: 400px;
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+    }
+
+    /* Default: sidebar visible, pane hidden */
+    .chat-container[data-chat-view="list"] .chat-sidebar,
+    .chat-container:not([data-chat-view]) .chat-sidebar {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0; left: 0;
+        z-index: 1;
+    }
+
+    .chat-container[data-chat-view="list"] .chat-pane,
+    .chat-container:not([data-chat-view]) .chat-pane {
+        display: none;
+    }
+
+    /* Chat view: pane full-screen, sidebar behind */
+    .chat-container[data-chat-view="chat"] .chat-sidebar {
+        display: none;
+    }
+
+    .chat-container[data-chat-view="chat"] .chat-pane {
+        display: flex !important;
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0; left: 0;
+        z-index: 2;
+        flex-direction: column;
+    }
+
+    /* Show back button on mobile */
+    #chat-back-btn { display: flex !important; }
+
+    /* Sticky input bar */
+    .chat-input-area {
+        position: sticky;
+        bottom: 0;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border-color);
+        z-index: 10;
+    }
+
+    .chat-message-input, #chat-message-input {
+        font-size: 16px !important;
+    }
+
+    /* Thread list items taller for touch */
+    .chat-thread-item { padding: 1rem 1.25rem; min-height: 68px; }
+
+    /* Bubbles wider on mobile */
+    .chat-bubble { max-width: 85%; }
+}
+
+/* =========================================
+   4. TEAMS / COLLABBOARD — Responsive
+   ========================================= */
+
+@media (max-width: 767px) {
+    /* 1-column card grid */
+    #collab-teams-grid.features-grid,
+    .features-grid { grid-template-columns: 1fr !important; }
+
+    /* Tags must wrap */
+    .tag-list { flex-wrap: wrap; gap: 0.35rem; }
+    .tag-badge { white-space: normal; word-break: break-word; }
+
+    /* Apply button full-width */
+    .team-card .btn { width: 100%; }
+
+    /* Skills filter chips scroll horizontally */
+    .skills-filter-container {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding-bottom: 0.5rem;
+        gap: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .skills-filter-container::-webkit-scrollbar { display: none; }
+    .skill-chip { flex-shrink: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* =========================================
+   5. FORUM — Pill tabs + hidden right panel
+   ========================================= */
+
+@media (max-width: 767px) {
+    /* Full single column */
+    .reddit-layout {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+
+    /* Subreddit list → horizontal scrollable pill row */
+    .reddit-sidebar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 0.25rem;
+    }
+    .reddit-sidebar::-webkit-scrollbar { display: none; }
+
+    .subreddit-list {
+        flex-direction: row !important;
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+    }
+
+    .subreddit-item {
+        white-space: nowrap;
+        flex-shrink: 0;
+        border-radius: var(--radius-full) !important;
+        padding: 0.5rem 1.1rem;
+        border: 1px solid var(--border-color);
+        min-height: 44px;
+    }
+
+    .subreddit-item.active {
+        border-left: none !important;
+        border: 1px solid var(--accent-yellow) !important;
+        background: rgba(245,200,66,0.1) !important;
+    }
+
+    /* Right widgets panel: hidden on mobile */
+    .reddit-widgets { display: none !important; }
+
+    /* Post cards compact */
+    .reddit-post-card { flex-direction: row; }
+    .reddit-upvote-panel { width: 36px; }
+
+    /* Action row: icon + count only (hide text labels) */
+    .reddit-action-btn .btn-label { display: none; }
+    .reddit-action-btn {
+        padding: 0.5rem;
+        gap: 0.25rem;
+        font-size: 0.8rem;
+    }
+
+    /* Post title smaller */
+    .reddit-post-title { font-size: 1rem; }
+    .reddit-post-body { font-size: 0.875rem; }
+
+    /* Sort bar scrollable */
+    .reddit-sort-bar {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+        scrollbar-width: none;
+    }
+    .reddit-sort-bar::-webkit-scrollbar { display: none; }
+    .reddit-sort-btn { flex-shrink: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .reddit-layout { grid-template-columns: 200px 1fr; }
+    .reddit-widgets { display: none; }
+}
+
+/* =========================================
+   6. PROFILE — Centered mobile layout
+   ========================================= */
+
+@media (max-width: 767px) {
+    .profile-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+
+    /* Avatar centered */
+    .profile-card {
+        padding: 2rem 1rem;
+        text-align: center;
+    }
+    .profile-avatar-large { margin: 0 auto 1rem; }
+
+    /* Tabs: full-width scrollable row */
+    .profile-tabs-header {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        gap: 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .profile-tabs-header::-webkit-scrollbar { display: none; }
+
+    .profile-tab-title {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* Listed items / teams / posts: 1-column list */
+    #profile-listings-grid.products-grid { grid-template-columns: 1fr; gap: 0.75rem; }
+    #profile-teams-grid.features-grid { grid-template-columns: 1fr; gap: 0.75rem; }
+
+    /* Social links center */
+    .profile-links { justify-content: center; }
+
+    /* Karma badge full-width */
+    .karma-badge-container { margin: 0 0 1.25rem; }
+
+    /* Bio box full width */
+    .profile-bio-box { padding: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .profile-grid { grid-template-columns: 260px 1fr; }
+}
+
+/* =========================================
+   7. HOME PAGE — Responsive hero
+   ========================================= */
+
+@media (max-width: 767px) {
+    .hero-title { font-size: 2rem !important; letter-spacing: -0.5px !important; }
+    .hero-subtitle { font-size: 1rem !important; margin-bottom: 2rem !important; }
+    .hero-actions { flex-direction: column; gap: 0.75rem; align-items: stretch; }
+    .hero-actions .btn { justify-content: center; }
+    .hero { padding: 3rem 0 !important; }
+
+    /* Superpowers grid: single column */
+    .superpowers-grid { grid-template-columns: 1fr !important; gap: 1rem !important; }
+
+    /* Container padding */
+    .container { padding: 0 1rem; }
+    .section { padding: 3rem 0; }
+
+    /* Section header */
+    .section-header h2 { font-size: 1.75rem; }
+
+    /* Footer compact */
+    .footer { padding: 1.5rem 0; font-size: 0.85rem; }
+
+    /* Hackathon hero compact */
+    .hackathon-hero { padding: 2rem 1.25rem; }
+    .hackathon-stats-row { gap: 1rem; }
+    .hackathon-stat-num { font-size: 1.5rem; }
+
+    /* Features grid */
+    .features-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .feature-card { padding: 1.5rem; }
+
+    /* Form cards */
+    .form-card { padding: 1.25rem; }
+    .form-row { flex-direction: column; gap: 0; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+    .hero-title { font-size: 2.75rem !important; }
+    .superpowers-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* =========================================
+   8. MODALS — Mobile-safe
+   ========================================= */
+
+@media (max-width: 767px) {
+    .modal-overlay { padding: 0.5rem; align-items: flex-end; }
+    .modal-content {
+        max-width: 100%;
+        border-radius: 1.25rem 1.25rem 0 0;
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+    .modal-body { padding: 1.25rem; }
+    .modal-header { padding: 1.1rem 1.25rem; }
+}
+
+/* =========================================
+   9. Hackathons — Mobile grid
+   ========================================= */
+
+@media (max-width: 767px) {
+    #hackathons-grid.features-grid { grid-template-columns: 1fr; }
+    .hackathon-banner { height: 110px; }
+    .hackathon-body { padding: 1rem; }
+    .hackathon-info-row { flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+}
+
+/* =========================================
+   10. No horizontal scroll at any width
+   ========================================= */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+/* Prevent table / pre overflow */
+table { max-width: 100%; overflow-x: auto; display: block; }
+
+/* Scrollbar hidden on mobile for cleaner UX */
+@media (max-width: 767px) {
+    ::-webkit-scrollbar { width: 0; height: 0; }
+}
+

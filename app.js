@@ -546,6 +546,11 @@ const app = {
             el.classList.remove('active');
         });
 
+        // Sync drawer link active state
+        document.querySelectorAll('#nav-drawer-links a').forEach(el => {
+            el.classList.remove('active');
+        });
+
         // Hide all page divisions
         document.querySelectorAll('.view').forEach(el => {
             el.classList.remove('active');
@@ -558,6 +563,15 @@ const app = {
         if (activeLink) {
             activeLink.classList.add('active');
         }
+
+        // Active drawer link
+        let activeDrawerLink = Array.from(document.querySelectorAll('#nav-drawer-links a')).find(a =>
+            a.getAttribute('onclick') && a.getAttribute('onclick').includes(`'${viewId === 'browse' && this.showWishlistOnly ? 'wishlist' : viewId}'`)
+        );
+        if (activeDrawerLink) {
+            activeDrawerLink.classList.add('active');
+        }
+
 
         // Display view container
         const targetView = document.getElementById(`view-${viewId}`);
@@ -2612,25 +2626,25 @@ const app = {
     },
 
     toggleChatSidebar(show) {
-        const sidebar = document.getElementById('chat-sidebar');
-        const pane = document.getElementById('chat-pane');
+        const container = document.querySelector('.chat-container');
         const backBtn = document.getElementById('chat-back-btn');
 
-        if (!sidebar || !pane) return;
+        if (!container) return;
 
-        if (window.innerWidth <= 768) {
+        if (window.innerWidth <= 767) {
+            // Use data-chat-view CSS-driven switching
             if (show) {
-                sidebar.classList.remove('inactive');
-                pane.classList.remove('active');
+                container.setAttribute('data-chat-view', 'list');
                 if (backBtn) backBtn.style.display = 'none';
             } else {
-                sidebar.classList.add('inactive');
-                pane.classList.add('active');
-                if (backBtn) backBtn.style.display = 'inline-flex';
+                container.setAttribute('data-chat-view', 'chat');
+                if (backBtn) backBtn.style.display = 'flex';
             }
         } else {
-            sidebar.classList.remove('inactive');
-            pane.classList.add('active');
+            // Desktop: always show both panes
+            container.setAttribute('data-chat-view', 'list');
+            const pane = document.getElementById('chat-pane');
+            if (pane) pane.style.display = 'flex';
             if (backBtn) backBtn.style.display = 'none';
         }
     },
@@ -3477,9 +3491,53 @@ const app = {
         }
     },
 
+    // ---- Mobile Nav Drawer ----
+    openNavDrawer() {
+        const drawer = document.getElementById('nav-drawer');
+        const overlay = document.getElementById('nav-drawer-overlay');
+        if (drawer) drawer.classList.add('open');
+        if (overlay) overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Update drawer user info
+        if (this.currentUser) {
+            const name = document.getElementById('drawer-user-name');
+            const email = document.getElementById('drawer-user-email');
+            const avatar = document.getElementById('drawer-user-avatar');
+            if (name) name.textContent = this.currentUser.name || 'Student';
+            if (email) email.textContent = this.currentUser.email || '';
+            if (avatar) avatar.textContent = (this.currentUser.name || 'S').charAt(0).toUpperCase();
+        }
+        lucide.createIcons();
+    },
+
+    closeNavDrawer() {
+        const drawer = document.getElementById('nav-drawer');
+        const overlay = document.getElementById('nav-drawer-overlay');
+        if (drawer) drawer.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+        document.body.style.overflow = '';
+    },
+
     toggleMobileMenu() {
-        const nav = document.getElementById('main-nav-links');
-        nav.classList.toggle('mobile-active');
+        this.openNavDrawer();
+    },
+
+    // ---- Filter Bottom Sheet ----
+    openFilterSheet() {
+        const sheet = document.getElementById('filter-bottom-sheet');
+        const overlay = document.getElementById('filter-sheet-overlay');
+        if (sheet) sheet.classList.add('open');
+        if (overlay) overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons();
+    },
+
+    closeFilterSheet() {
+        const sheet = document.getElementById('filter-bottom-sheet');
+        const overlay = document.getElementById('filter-sheet-overlay');
+        if (sheet) sheet.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+        document.body.style.overflow = '';
     },
 
     logout() {
