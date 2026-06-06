@@ -1445,8 +1445,7 @@ h1, h2, h3, h4 {
 .chat-container {
     display: grid;
     grid-template-columns: 320px 1fr;
-    height: calc(100vh - 120px);
-    min-height: 550px;
+    height: 100%;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     background: rgba(21, 22, 28, 0.5);
@@ -1777,7 +1776,7 @@ h1, h2, h3, h4 {
 @media (max-width: 768px) {
     .chat-container {
         grid-template-columns: 1fr;
-        height: 550px;
+        height: 100%;
     }
     
     .chat-sidebar {
@@ -2890,8 +2889,7 @@ body { overflow-x: hidden; }
 @media (max-width: 767px) {
     .chat-container {
         display: block !important;
-        height: calc(100vh - 130px);
-        min-height: 400px;
+        height: 100%;
         position: relative;
         overflow: hidden;
         border-radius: var(--radius-lg);
@@ -3199,5 +3197,34 @@ table { max-width: 100%; overflow-x: auto; display: block; }
 /* Scrollbar hidden on mobile for cleaner UX */
 @media (max-width: 767px) {
     ::-webkit-scrollbar { width: 0; height: 0; }
+}
+
+/* =========================================
+   11. MESSAGES — Full height viewport layout fixes
+   ========================================= */
+#view-chat .section {
+    padding: 0 !important;
+}
+
+#view-chat .container {
+    height: calc(100vh - 72px);
+    max-width: 1400px !important;
+    display: flex;
+    flex-direction: column;
+    padding-top: 1rem !important;
+    padding-bottom: 0 !important;
+}
+
+@media (max-width: 767px) {
+    #view-chat .container {
+        height: calc(100vh - 69px);
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    #view-chat .chat-container {
+        border-radius: 0 !important;
+        border: none !important;
+    }
 }
 
