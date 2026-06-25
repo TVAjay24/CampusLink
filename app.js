@@ -28,6 +28,21 @@ if (typeof supabase !== 'undefined' && supabaseConfig.url !== "YOUR_SUPABASE_URL
     console.log("CampusLink: Running in Local Storage database mode (No Supabase keys found).");
 }
 
+function parseArrayField(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    // Try JSON parse first
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) {}
+    // Fall back to comma-split
+    return value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 const app = {
     // Active navigation state
     currentView: 'home',
@@ -44,6 +59,10 @@ const app = {
     // Reddit states
     activeSubreddit: 'all',
     activeRedditSort: 'hot',
+
+    parseArrayField(value) {
+        return parseArrayField(value);
+    },
 
     isSupabaseEnabled() {
         return supabaseClient !== null;
@@ -1356,7 +1375,7 @@ const app = {
             let dataToRender = teams;
             if (filterSkill !== 'all') {
                 dataToRender = teams.filter(t => {
-                    const skillsArr = t.skills.split(',').map(s => s.trim().toLowerCase());
+                    const skillsArr = this.parseArrayField(t.skills).map(s => s.toLowerCase());
                     return skillsArr.includes(filterSkill.toLowerCase());
                 });
             }
@@ -1379,11 +1398,13 @@ const app = {
                 card.className = 'feature-card glass-panel team-card';
                 
                 // Skill tags
-                const skillsArr = (team.skills || 'General').split(',').map(s => s.trim()).filter(Boolean);
+                const skillsArr = this.parseArrayField(team.skills);
+                if (skillsArr.length === 0) skillsArr.push('General');
                 let skillsBadges = skillsArr.map(s => `<span class="tag-badge skill">${s}</span>`).join('');
 
                 // Open Roles tags
-                const rolesArr = (team.openRoles || 'Open').split(',').map(r => r.trim()).filter(Boolean);
+                const rolesArr = this.parseArrayField(team.openRoles || team.open_roles);
+                if (rolesArr.length === 0) rolesArr.push('Open');
                 let rolesBadges = rolesArr.map(r => `<span class="tag-badge role">${r}</span>`).join('');
 
                 const isOwner = team.createdByEmail === this.currentUser.email;
@@ -1473,7 +1494,7 @@ const app = {
         // Extract all unique skills
         let allSkills = new Set();
         teams.forEach(t => {
-            (t.skills || '').split(',').forEach(s => {
+            this.parseArrayField(t.skills).forEach(s => {
                 const skill = s.trim();
                 if (skill !== '') allSkills.add(skill);
             });
@@ -2200,8 +2221,9 @@ const app = {
             // Render skills list
             const skillsContainer = document.getElementById('profile-skills-list');
             skillsContainer.innerHTML = '';
-            if (profile.skills && profile.skills.length > 0) {
-                profile.skills.forEach(skill => {
+            const profileSkills = this.parseArrayField(profile.skills);
+            if (profileSkills.length > 0) {
+                profileSkills.forEach(skill => {
                     const sBadge = document.createElement('span');
                     sBadge.className = 'tag-badge skill';
                     sBadge.textContent = skill;
@@ -3597,7 +3619,7 @@ const app = {
                         if (error) throw error;
                         const prof = profile || { bio: "", skills: [], github: "", linkedin: "" };
                         document.getElementById('edit-bio').value = prof.bio || "";
-                        document.getElementById('edit-skills').value = (prof.skills || []).join(', ');
+                        document.getElementById('edit-skills').value = this.parseArrayField(prof.skills).join(', ');
                         document.getElementById('edit-github').value = prof.github || "";
                         document.getElementById('edit-linkedin').value = prof.linkedin || "";
                     }).catch(err => console.error("Failed to fetch profile for editing:", err));
@@ -3606,7 +3628,7 @@ const app = {
                     const profile = JSON.parse(localStorage.getItem(profileKey)) || { bio: "", skills: [], github: "", linkedin: "" };
 
                     document.getElementById('edit-bio').value = profile.bio || "";
-                    document.getElementById('edit-skills').value = (profile.skills || []).join(', ');
+                    document.getElementById('edit-skills').value = this.parseArrayField(profile.skills).join(', ');
                     document.getElementById('edit-github').value = profile.github || "";
                     document.getElementById('edit-linkedin').value = profile.linkedin || "";
                 }
@@ -5417,8 +5439,8 @@ const app = {
                         <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px;">By: ${team.creator_name || team.creatorName || team.creator_email}</div>
                     </div>
                     <div style="color: #8b8b9a; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${team.description}">${team.description}</div>
-                    <div style="color: #f0f0f4; font-size: 13px;">${(team.skills || []).join(', ')}</div>
-                    <div style="color: #f0f0f4; font-size: 13px;">${(team.open_roles || team.openRoles || []).join(', ')}</div>
+                    <div style="color: #f0f0f4; font-size: 13px;">${this.parseArrayField(team.skills).join(', ')}</div>
+                    <div style="color: #f0f0f4; font-size: 13px;">${this.parseArrayField(team.open_roles || team.openRoles).join(', ')}</div>
                     <div style="text-align: right;">
                         <button onclick="app.deleteAdminTeam('${team.id}')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8b8b9a'" title="Delete Team">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
