@@ -1031,10 +1031,10 @@ const app = {
             } else if (isOwner) {
                 cardActions = `
                     <div class="product-owner-actions">
-                        <button class="btn btn-secondary owner-btn" onclick="app.openEditListing(${product.id})">
+                        <button class="btn btn-secondary owner-btn" onclick="app.openEditListing('${product.id}')">
                             <i data-lucide="edit" style="width: 14px; height: 14px;"></i> Edit
                         </button>
-                        <button class="btn btn-secondary owner-btn delete" onclick="app.deleteListing(${product.id})">
+                        <button class="btn btn-secondary owner-btn delete" onclick="app.deleteListing('${product.id}')">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Delete
                         </button>
                     </div>
@@ -1043,14 +1043,14 @@ const app = {
                 cardActions = `
                     <div class="product-actions-btn-group" style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
                         <div style="display: flex; gap: 0.5rem; width: 100%;">
-                            <button class="btn btn-primary product-action-btn" onclick="app.buyContactItem(${product.id})" style="flex: 1;">
+                            <button class="btn btn-primary product-action-btn" onclick="app.buyContactItem('${product.id}')" style="flex: 1;">
                                 <i data-lucide="message-square" style="width: 14px; height: 14px;"></i> Buy / Contact
                             </button>
-                            <button class="btn btn-secondary product-action-btn" onclick="app.openNegotiateModal(${product.id})" style="flex: 1; border-color: rgba(245, 200, 66, 0.4); background: rgba(245, 200, 66, 0.1); color: var(--accent-yellow);">
+                            <button class="btn btn-secondary product-action-btn" onclick="app.openNegotiateModal('${product.id}')" style="flex: 1; border-color: rgba(245, 200, 66, 0.4); background: rgba(245, 200, 66, 0.1); color: var(--accent-yellow);">
                                 <i data-lucide="percent" style="width: 14px; height: 14px;"></i> Negotiate
                             </button>
                         </div>
-                        <button class="btn btn-secondary product-action-btn ai-chat-btn" onclick="app.chatWithAiAboutListing(${product.id})" style="width: 100%; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.1); color: #818cf8;" title="Chat with AI Assistant">
+                        <button class="btn btn-secondary product-action-btn ai-chat-btn" onclick="app.chatWithAiAboutListing('${product.id}')" style="width: 100%; border-color: rgba(99, 102, 241, 0.4); background: rgba(99, 102, 241, 0.1); color: #818cf8;" title="Chat with AI Assistant">
                             <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Ask AI
                         </button>
                     </div>
@@ -1073,8 +1073,8 @@ const app = {
                                     <span style="color:var(--accent-yellow); font-weight:800; font-size:0.85rem;">₹${offer.proposed_price}</span>
                                 </div>
                                 <div class="offer-buttons-pills">
-                                    <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer(${offer.id}, ${product.id})">Accept</button>
-                                    <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer(${offer.id})">Decline</button>
+                                    <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer('${offer.id}', '${product.id}')">Accept</button>
+                                    <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer('${offer.id}')">Decline</button>
                                 </div>
                             </div>
                         `;
@@ -1087,7 +1087,7 @@ const app = {
             const productImg = product.image ? product.image : placeholderImg;
 
             card.innerHTML = `
-                <button class="wishlist-btn ${heartClass}" onclick="app.toggleWishlist(${product.id}, event)">
+                <button class="wishlist-btn ${heartClass}" onclick="app.toggleWishlist('${product.id}', event)">
                     <i data-lucide="heart" style="width: 16px; height: 16px; fill: ${isLiked ? 'currentColor' : 'none'};"></i>
                 </button>
                 <div class="product-image-container">
@@ -1396,8 +1396,8 @@ const app = {
                     const badgeStr = count > 0 ? ` <span class="badge-count" style="margin-left:5px;">${count}</span>` : '';
                     actionBtn = `
                         <div style="display:flex; gap:0.5rem; margin-top:auto;">
-                            <button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="flex:1;">Manage${badgeStr}</button>
-                            <button class="btn" onclick="app.deleteTeam(${team.id})" title="Delete Team"
+                            <button class="btn btn-primary" onclick="app.openManageApplicants('${team.id}')" style="flex:1;">Manage${badgeStr}</button>
+                            <button class="btn" onclick="app.deleteTeam('${team.id}')" title="Delete Team"
                                 style="background:rgba(255,80,80,0.15); color:#ff5050; border:1px solid rgba(255,80,80,0.4); padding:0 0.75rem; border-radius:8px; cursor:pointer; transition:all 0.2s;"
                                 onmouseover="this.style.background='rgba(255,80,80,0.3)'" onmouseout="this.style.background='rgba(255,80,80,0.15)'">
                                 <i data-lucide="trash-2" style="width:15px; height:15px;"></i>
@@ -1406,7 +1406,7 @@ const app = {
                 } else if (hasApplied) {
                     actionBtn = `<button class="btn btn-secondary" style="width:100%; margin-top: auto;" disabled>Application Sent</button>`;
                 } else {
-                    actionBtn = `<button class="btn btn-primary" onclick="app.applyToTeam(${team.id})" style="width:100%; margin-top: auto;">Apply / Join</button>`;
+                    actionBtn = `<button class="btn btn-primary" onclick="app.applyToTeam('${team.id}')" style="width:100%; margin-top: auto;">Apply / Join</button>`;
                 }
 
                 card.innerHTML = `
@@ -1688,7 +1688,7 @@ const app = {
                 } else if (hasRegistered) {
                     actionBtn = `<button class="btn btn-secondary" style="width: 100%; border-color: #34d399; color: #34d399;" disabled><i data-lucide="check-circle" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Registered</button>`;
                 } else {
-                    actionBtn = `<button class="btn btn-primary" onclick="app.openRegisterHackathon(${hack.id})" style="width: 100%;">Register Team</button>`;
+                    actionBtn = `<button class="btn btn-primary" onclick="app.openRegisterHackathon('${hack.id}')" style="width: 100%;">Register Team</button>`;
                 }
 
                 // Timeline HTML
@@ -1858,7 +1858,7 @@ const app = {
 
                 const isAuthor = post.authorEmail === this.currentUser.email;
                 const deleteBtn = isAuthor ? `
-                    <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost(${post.id})">
+                    <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost('${post.id}')">
                         <i data-lucide="trash-2" style="width: 12px; height:12px;"></i> Delete
                     </button>
                 ` : '';
@@ -1867,11 +1867,11 @@ const app = {
 
                 card.innerHTML = `
                     <div class="reddit-upvote-panel">
-                        <button class="vote-arrow up ${upClass}" onclick="app.voteRedditPost(${post.id}, 1)">
+                        <button class="vote-arrow up ${upClass}" onclick="app.voteRedditPost('${post.id}', 1)">
                             <i data-lucide="arrow-up" style="width: 20px; height: 20px;"></i>
                         </button>
                         <span class="vote-count" style="font-size:0.85rem;">${score}</span>
-                        <button class="vote-arrow down ${downClass}" onclick="app.voteRedditPost(${post.id}, -1)">
+                        <button class="vote-arrow down ${downClass}" onclick="app.voteRedditPost('${post.id}', -1)">
                             <i data-lucide="arrow-down" style="width: 20px; height: 20px;"></i>
                         </button>
                     </div>
@@ -1891,7 +1891,7 @@ const app = {
                         <p class="reddit-post-body">${post.body}</p>
 
                         <div class="reddit-post-footer">
-                            <button class="reddit-action-btn" onclick="app.toggleRedditComments(${post.id})">
+                            <button class="reddit-action-btn" onclick="app.toggleRedditComments('${post.id}')">
                                 <i data-lucide="message-square" style="width: 14px; height: 14px;"></i>
                                 <span>${commentCount} Comment${commentCount === 1 ? '' : 's'}</span>
                             </button>
@@ -1900,7 +1900,7 @@ const app = {
 
                         <!-- Threaded comments drawer -->
                         <div class="post-comments-drawer" id="reddit-comments-drawer-${post.id}">
-                            <form class="comment-input-area" onsubmit="app.submitRedditComment(${post.id}, event)" style="margin-top: 1rem;">
+                            <form class="comment-input-area" onsubmit="app.submitRedditComment('${post.id}', event)" style="margin-top: 1rem;">
                                 <input type="text" id="reddit-comment-input-${post.id}" class="form-control" placeholder="Add a public reply..." required autocomplete="off">
                                 <button type="submit" class="btn btn-primary" style="padding:0.5rem 1rem;"><i data-lucide="corner-down-left"></i></button>
                             </form>
@@ -2262,7 +2262,7 @@ const app = {
                             <h4 style="margin-bottom: 0.5rem;">${team.teamName}</h4>
                             <p style="font-size:0.8rem; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${team.description}</p>
                             <div style="margin-top:1.5rem;">
-                                <button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; font-size:0.8rem; padding: 0.4rem;">Manage Applicants (${appCount})</button>
+                                <button class="btn btn-primary" onclick="app.openManageApplicants('${team.id}')" style="width:100%; font-size:0.8rem; padding: 0.4rem;">Manage Applicants (${appCount})</button>
                             </div>
                         </div>
                     `;
@@ -2357,7 +2357,7 @@ const app = {
                         <h4 style="margin-bottom: 0.5rem;">${team.teamName}</h4>
                         <p style="font-size:0.8rem; color:var(--text-muted); display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${team.description}</p>
                         <div style="margin-top:1.5rem;">
-                            <button class="btn btn-primary" onclick="app.openManageApplicants(${team.id})" style="width:100%; font-size:0.8rem; padding: 0.4rem;">Manage Applicants (${appCount})</button>
+                            <button class="btn btn-primary" onclick="app.openManageApplicants('${team.id}')" style="width:100%; font-size:0.8rem; padding: 0.4rem;">Manage Applicants (${appCount})</button>
                         </div>
                     </div>
                 `;
@@ -2384,7 +2384,7 @@ const app = {
                     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom: 0.5rem;">
                         <span class="flair ${post.flair.toLowerCase()}" style="font-size:0.65rem;">${post.flair}</span>
                         <span style="font-size:0.75rem; color:var(--accent-yellow); font-weight:700;">r/${post.subreddit}</span>
-                        <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost(${post.id})" style="font-size:0.75rem;"><i data-lucide="trash-2" style="width:12px; height:12px;"></i> Delete</button>
+                        <button class="reddit-action-btn delete-btn" onclick="app.deleteRedditPost('${post.id}')" style="font-size:0.75rem;"><i data-lucide="trash-2" style="width:12px; height:12px;"></i> Delete</button>
                     </div>
                     <h4 style="margin-bottom:0.25rem; text-align:left;">${post.title}</h4>
                     <p style="font-size:0.85rem; color:var(--text-muted);">${post.timestamp}</p>
@@ -2615,8 +2615,8 @@ const app = {
                 if (offer) {
                     actionButtonsHtml = `
                         <div class="offer-buttons-pills" style="margin-top: 0.5rem; justify-content: flex-end;">
-                            <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer(${offer.id}, ${offer.item_id})" style="padding: 4px 10px; font-size: 0.75rem;">Accept</button>
-                            <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer(${offer.id})" style="padding: 4px 10px; font-size: 0.75rem;">Decline</button>
+                            <button class="btn-offer-action accept" onclick="app.acceptNegotiationOffer('${offer.id}', '${offer.item_id}')" style="padding: 4px 10px; font-size: 0.75rem;">Accept</button>
+                            <button class="btn-offer-action decline" onclick="app.declineNegotiationOffer('${offer.id}')" style="padding: 4px 10px; font-size: 0.75rem;">Decline</button>
                         </div>
                     `;
                 }
