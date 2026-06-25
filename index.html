@@ -21,7 +21,7 @@
     <div id="auth-page" class="auth-page">
         <div class="auth-bg-glow"></div>
         <div class="auth-card glass-panel">
-            <div class="auth-logo">Campus<span class="text-accent">Link</span></div>
+            <div class="auth-logo" ondblclick="app.handleLogoDoubleClick()">Campus<span class="text-accent">Link</span></div>
             <div class="auth-tabs">
                 <div class="auth-tab active" id="tab-signin" onclick="app.switchAuthTab('signin')">Sign In</div>
                 <div class="auth-tab" id="tab-signup" onclick="app.switchAuthTab('signup')">Sign Up</div>
@@ -119,7 +119,7 @@
     <!-- Mobile Nav Drawer -->
     <div class="nav-drawer" id="nav-drawer">
         <div class="nav-drawer-header">
-            <span class="nav-drawer-logo">Campus<span class="text-accent">Link</span></span>
+            <span class="nav-drawer-logo" ondblclick="app.handleLogoDoubleClick()">Campus<span class="text-accent">Link</span></span>
             <button class="nav-drawer-close" onclick="app.closeNavDrawer()" aria-label="Close menu">
                 <i data-lucide="x" style="width:20px;height:20px;"></i>
             </button>
@@ -163,7 +163,7 @@
 
     <header class="navbar" id="main-navbar" style="display: none;">
         <div class="container nav-container">
-            <a href="#" class="logo" onclick="app.navigate('home')">
+            <a href="#" class="logo" onclick="app.navigate('home')" ondblclick="app.handleLogoDoubleClick()">
                 Campus<span class="text-accent">Link</span>
             </a>
             <nav class="nav-links" id="main-nav-links">
@@ -193,6 +193,12 @@
     <main id="app-content" style="display: none;">
         <!-- View: Home -->
         <div id="view-home" class="view active">
+            <!-- Announcements Banner Container -->
+            <div id="announcements-banner-container" class="student-banner-container container" style="margin-top: 2rem; margin-bottom: 1rem;"></div>
+
+            <!-- Events Banner Container -->
+            <div id="events-banner-container" class="student-banner-container container" style="margin-top: 1rem; margin-bottom: 2rem;"></div>
+
             <!-- Hero Section -->
             <section class="hero relative" style="padding: 4rem 0;">
                 <div class="hero-bg-glow"></div>
@@ -1091,6 +1097,184 @@
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- View: Admin Dashboard Console -->
+    <div id="view-admin" class="view" style="display: none; min-height: 100vh; background: #0d0d0f; color: #f0f0f4; font-family: 'Inter', sans-serif; width: 100%;">
+        
+        <!-- SIDEBAR -->
+        <aside style="width: 240px; flex-shrink: 0; background: #131316; border-right: 1px solid #2a2a33; padding: 24px 0; display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; z-index: 10;">
+            <!-- Logo -->
+            <div style="padding: 0 20px 24px; border-bottom: 1px solid #2a2a33;">
+                <div style="font-size: 18px; font-weight: 700; color: #f5c842; letter-spacing: -0.02em;">
+                    CampusLink
+                </div>
+                <div style="font-size: 11px; font-weight: 600; color: #6C63FF; letter-spacing: 0.08em; margin-top: 2px;">
+                    ADMIN CONSOLE
+                </div>
+            </div>
+
+            <!-- Nav -->
+            <nav style="flex: 1; padding: 16px 12px;" id="admin-nav-links">
+                <button onclick="app.loadAdminTab('overview')" id="admin-tab-overview" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 4px; background: transparent; color: #8b8b9a; font-size: 14px; border-left: 3px solid transparent; transition: all 0.15s ease;">
+                    <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i> Overview
+                </button>
+                <button onclick="app.loadAdminTab('events')" id="admin-tab-events" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 4px; background: transparent; color: #8b8b9a; font-size: 14px; border-left: 3px solid transparent; transition: all 0.15s ease;">
+                    <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> Events
+                </button>
+                <button onclick="app.loadAdminTab('announcements')" id="admin-tab-announcements" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 4px; background: transparent; color: #8b8b9a; font-size: 14px; border-left: 3px solid transparent; transition: all 0.15s ease;">
+                    <i data-lucide="megaphone" style="width: 16px; height: 16px;"></i> Announcements
+                </button>
+                <button onclick="app.loadAdminTab('users')" id="admin-tab-users" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 4px; background: transparent; color: #8b8b9a; font-size: 14px; border-left: 3px solid transparent; transition: all 0.15s ease;">
+                    <i data-lucide="users" style="width: 16px; height: 16px;"></i> Users
+                </button>
+            </nav>
+
+            <!-- Bottom -->
+            <div style="padding: 16px 12px; border-top: 1px solid #2a2a33;">
+                <button onclick="app.navigate('home')" style="display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: none; border-radius: 8px; cursor: pointer; background: transparent; color: #8b8b9a; font-size: 14px; transition: all 0.15s ease;" onmouseover="this.style.color='#ef4444'; this.style.background='rgba(239,68,68,0.08)';" onmouseout="this.style.color='#8b8b9a'; this.style.background='transparent';">
+                    <i data-lucide="log-out" style="width: 16px; height: 16px;"></i>
+                    Back to CampusLink
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main style="flex: 1; padding: 32px 40px; overflow-y: auto;" id="admin-main-content">
+            <!-- Dynamic tab content will be rendered here -->
+        </main>
+    </div>
+
+    <!-- Admin Event Modal -->
+    <div id="admin-event-modal" class="admin-modal-overlay" onclick="if(event.target === this) app.closeAdminModal('admin-event-modal')">
+        <div class="admin-modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0;" id="admin-event-modal-title">New Event</h2>
+                <button onclick="app.closeAdminModal('admin-event-modal')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 4px;">
+                    <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                </button>
+            </div>
+
+            <form id="admin-event-form" onsubmit="app.handleAdminEventSubmit(event)">
+                <input type="hidden" id="admin-event-id">
+                <div style="display: grid; gap: 16px;">
+                    <div>
+                        <label class="admin-label">Event Title *</label>
+                        <input type="text" id="admin-event-title" class="admin-form-control" placeholder="e.g. Technovanza 2025" required>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label class="admin-label">Date *</label>
+                            <input type="date" id="admin-event-date" class="admin-form-control" required>
+                        </div>
+                        <div>
+                            <label class="admin-label">Time</label>
+                            <input type="time" id="admin-event-time" class="admin-form-control">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label class="admin-label">Event Type</label>
+                            <select id="admin-event-type" class="admin-form-control">
+                                <option value="technical">Technical</option>
+                                <option value="hackathon">Hackathon</option>
+                                <option value="cultural">Cultural</option>
+                                <option value="sports">Sports</option>
+                                <option value="placement">Placement</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="admin-label">Venue</label>
+                            <input type="text" id="admin-event-venue" class="admin-form-control" placeholder="e.g. Seminar Hall">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="admin-label">Description</label>
+                        <textarea id="admin-event-description" class="admin-form-control" style="min-height: 80px; resize: vertical;" placeholder="Describe the event..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="admin-label">Registration Link</label>
+                        <input type="url" id="admin-event-link" class="admin-form-control" placeholder="https://forms.gle/...">
+                    </div>
+
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; user-select: none;">
+                        <input type="checkbox" id="admin-event-featured">
+                        <span>Mark as Featured Event</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end;">
+                    <button type="button" onclick="app.closeAdminModal('admin-event-modal')" class="admin-btn admin-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="admin-btn admin-btn-primary" id="admin-event-submit-btn">
+                        Create Event
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Announcement Modal -->
+    <div id="admin-announcement-modal" class="admin-modal-overlay" onclick="if(event.target === this) app.closeAdminModal('admin-announcement-modal')">
+        <div class="admin-modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0;" id="admin-announcement-modal-title">New Announcement</h2>
+                <button onclick="app.closeAdminModal('admin-announcement-modal')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 4px;">
+                    <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                </button>
+            </div>
+
+            <form id="admin-announcement-form" onsubmit="app.handleAdminAnnouncementSubmit(event)">
+                <input type="hidden" id="admin-announcement-id">
+                <div style="display: grid; gap: 16px;">
+                    <div>
+                        <label class="admin-label">Announcement Title *</label>
+                        <input type="text" id="admin-announcement-title" class="admin-form-control" placeholder="e.g. Server Maintenance Notice" required>
+                    </div>
+
+                    <div>
+                        <label class="admin-label">Announcement Body *</label>
+                        <textarea id="admin-announcement-body" class="admin-form-control" style="min-height: 120px; resize: vertical;" placeholder="Enter notice details..." required></textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <label class="admin-label">Priority</label>
+                            <select id="admin-announcement-priority" class="admin-form-control">
+                                <option value="normal">Normal</option>
+                                <option value="low">Low</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="admin-label">Expires At</label>
+                            <input type="datetime-local" id="admin-announcement-expires" class="admin-form-control">
+                        </div>
+                    </div>
+
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; user-select: none;">
+                        <input type="checkbox" id="admin-announcement-active" checked>
+                        <span>Active</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end;">
+                    <button type="button" onclick="app.closeAdminModal('announcement-modal')" class="admin-btn admin-btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="admin-btn admin-btn-primary" id="admin-announcement-submit-btn">
+                        Post Announcement
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -100,43 +100,45 @@ const app = {
     },
 
     handleSupabaseUserSession(authUser) {
-        supabaseClient
-            .from('users')
-            .select('*')
-            .eq('email', authUser.email)
-            .single()
-            .then(({ data, error }) => {
-                if (error || !data) {
-                    console.error("User profile document not found in Supabase:", error);
-                    this.logout();
-                } else {
-                    this.currentUser = {
-                        ...data,
-                        email: authUser.email // Enforce key
-                    };
+        Promise.all([
+            supabaseClient.from('users').select('*').eq('email', authUser.email).single(),
+            supabaseClient.from('profiles').select('role').eq('email', authUser.email).maybeSingle()
+        ]).then(([userRes, profileRes]) => {
+            if (userRes.error || !userRes.data) {
+                console.error("User profile document not found in Supabase:", userRes.error);
+                this.logout();
+            } else {
+                this.currentUser = {
+                    ...userRes.data,
+                    email: authUser.email,
+                    role: profileRes.data?.role || 'student'
+                };
 
-                    // Auto-seed GitHub for the owner account if not yet set
-                    if (authUser.email === 'vvce25cse0197@vvce.ac.in') {
-                        supabaseClient.from('profiles')
-                            .select('github')
-                            .eq('email', authUser.email)
-                            .maybeSingle()
-                            .then(({ data: prof }) => {
-                                if (!prof || !prof.github) {
-                                    supabaseClient.from('profiles').upsert({
-                                        email: authUser.email,
-                                        github: 'TVAjay24',
-                                        bio: prof ? (prof.bio || '') : 'CSE student at VVCE. Building CampusLink.',
-                                        skills: prof ? (prof.skills || ['JavaScript','HTML','CSS','Supabase']) : ['JavaScript','HTML','CSS','Supabase'],
-                                        linkedin: prof ? (prof.linkedin || '') : ''
-                                    }).then(() => console.log('GitHub TVAjay24 linked to profile.'));
-                                }
-                            });
-                    }
-
-                    this.renderAuthenticatedUI();
+                // Auto-seed GitHub for the owner account if not yet set
+                if (authUser.email === 'vvce25cse0197@vvce.ac.in') {
+                    supabaseClient.from('profiles')
+                        .select('github')
+                        .eq('email', authUser.email)
+                        .maybeSingle()
+                        .then(({ data: prof }) => {
+                            if (!prof || !prof.github) {
+                                supabaseClient.from('profiles').upsert({
+                                    email: authUser.email,
+                                    github: 'TVAjay24',
+                                    bio: prof ? (prof.bio || '') : 'CSE student at VVCE. Building CampusLink.',
+                                    skills: prof ? (prof.skills || ['JavaScript','HTML','CSS','Supabase']) : ['JavaScript','HTML','CSS','Supabase'],
+                                    linkedin: prof ? (prof.linkedin || '') : ''
+                                }).then(() => console.log('GitHub TVAjay24 linked to profile.'));
+                            }
+                        });
                 }
-            });
+
+                this.renderAuthenticatedUI();
+            }
+        }).catch(err => {
+            console.error("Error in handleSupabaseUserSession:", err);
+            this.logout();
+        });
     },
 
 
@@ -146,6 +148,28 @@ const app = {
         document.getElementById('main-navbar').style.display = 'block';
         document.getElementById('app-content').style.display = 'block';
         document.getElementById('main-footer').style.display = 'block';
+
+        // Update logo interactions based on role
+        const logo = document.querySelector('.logo');
+        const drawerLogo = document.querySelector('.nav-drawer-logo');
+        const authLogo = document.querySelector('.auth-logo');
+        const isAdmin = this.currentUser && this.currentUser.role === 'admin';
+        
+        if (logo) {
+            logo.style.cursor = isAdmin ? 'pointer' : 'default';
+            logo.style.userSelect = 'none';
+            logo.title = isAdmin ? 'Double-click to open Admin Dashboard' : '';
+        }
+        if (drawerLogo) {
+            drawerLogo.style.cursor = isAdmin ? 'pointer' : 'default';
+            drawerLogo.style.userSelect = 'none';
+            drawerLogo.title = isAdmin ? 'Double-click to open Admin Dashboard' : '';
+        }
+        if (authLogo) {
+            authLogo.style.cursor = isAdmin ? 'pointer' : 'default';
+            authLogo.style.userSelect = 'none';
+            authLogo.title = isAdmin ? 'Double-click to open Admin Dashboard' : '';
+        }
 
         // Configure chip tags (Initials SG, name split)
         document.getElementById('user-chip-name').textContent = this.currentUser.name.split(' ')[0];
@@ -502,6 +526,68 @@ const app = {
             ];
             localStorage.setItem('cl_offers', JSON.stringify(mockOffers));
         }
+
+        // Mock Events
+        if (!localStorage.getItem('cl_events')) {
+            const mockEvents = [
+                {
+                    id: "mock-event-1",
+                    title: "Technovanza 2026",
+                    description: "Annual national level technical festival at Vidyavardhaka College of Engineering.",
+                    event_type: "technical",
+                    date: "2026-07-15",
+                    time: "09:30",
+                    venue: "VVCE Campus Main Auditorium",
+                    registration_link: "https://vvce.ac.in",
+                    is_featured: true,
+                    created_by: "mock-admin-uuid",
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                },
+                {
+                    id: "mock-event-2",
+                    title: "VVCE Hackfest 2026",
+                    description: "24-hour coding marathon to solve real-world industry problems.",
+                    event_type: "hackathon",
+                    date: "2026-08-05",
+                    time: "10:00",
+                    venue: "CSE Sem Hall / Labs",
+                    registration_link: "https://vvce.ac.in",
+                    is_featured: true,
+                    created_by: "mock-admin-uuid",
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            ];
+            localStorage.setItem('cl_events', JSON.stringify(mockEvents));
+        }
+
+        // Mock Announcements
+        if (!localStorage.getItem('cl_announcements')) {
+            const mockAnnouncements = [
+                {
+                    id: "mock-announcement-1",
+                    title: "Final Semester Exam Schedule Released",
+                    body: "The final semester exam schedule for all branches has been uploaded to the official portal. Exams commence from July 10th. Please check your respective notice boards for seat layout details.",
+                    priority: "high",
+                    is_active: true,
+                    expires_at: "2026-07-20T23:59:59.000Z",
+                    created_by: "mock-admin-uuid",
+                    created_at: new Date().toISOString()
+                },
+                {
+                    id: "mock-announcement-2",
+                    title: "Main Campus WiFi Maintenance",
+                    body: "The college Wi-Fi network will undergo routine security updates and maintenance on Sunday, June 28th, from 9:00 AM to 3:00 PM. Access may be intermittent during this window.",
+                    priority: "normal",
+                    is_active: true,
+                    expires_at: "2026-06-29T00:00:00.000Z",
+                    created_by: "mock-admin-uuid",
+                    created_at: new Date().toISOString()
+                }
+            ];
+            localStorage.setItem('cl_announcements', JSON.stringify(mockAnnouncements));
+        }
     },
 
     // 2. SESSION & SECURITY GUARD
@@ -510,9 +596,22 @@ const app = {
 
         if (storedUser) {
             this.currentUser = JSON.parse(storedUser);
+            if (!this.currentUser.role) {
+                const email = this.currentUser.email;
+                this.currentUser.role = (email === 'admin@vvce.ac.in' || email === 'vvce25cse0197@vvce.ac.in') ? 'admin' : 'student';
+                localStorage.setItem('cl_current_user', JSON.stringify(this.currentUser));
+            }
             this.renderAuthenticatedUI();
         } else {
             this.renderAnonymousUI();
+        }
+    },
+
+    handleLogoDoubleClick() {
+        if (this.currentUser && this.currentUser.role === 'admin') {
+            this.navigate('admin');
+        } else {
+            this.showToast('Admin access required', 'error');
         }
     },
 
@@ -527,6 +626,37 @@ const app = {
             this.checkAuthSession();
             return;
         }
+
+        // Admin Dashboard Route Protection & Display Swapping
+        const viewAdmin = document.getElementById('view-admin');
+        if (viewId === 'admin') {
+            if (this.currentUser.role === 'admin') {
+                document.getElementById('main-navbar').style.display = 'none';
+                document.getElementById('app-content').style.display = 'none';
+                document.getElementById('main-footer').style.display = 'none';
+                if (viewAdmin) {
+                    viewAdmin.style.display = 'flex';
+                }
+                this.currentView = 'admin';
+                this.loadAdminTab(this.currentAdminTab || 'overview');
+                window.scrollTo(0, 0);
+                return;
+            } else {
+                this.showToast('Admin access required', 'error');
+                viewId = 'home'; // Redirect student to homepage
+            }
+        }
+
+        // Restore standard shells if navigating away from admin
+        if (viewAdmin) {
+            viewAdmin.style.display = 'none';
+        }
+        const mainNavbar = document.getElementById('main-navbar');
+        const appContent = document.getElementById('app-content');
+        const mainFooter = document.getElementById('main-footer');
+        if (mainNavbar) mainNavbar.style.display = 'block';
+        if (appContent) appContent.style.display = 'block';
+        if (mainFooter) mainFooter.style.display = 'block';
 
         // Intercept wishlist navigation and map to browse view with toggle active
         if (viewId === 'wishlist') {
@@ -581,7 +711,10 @@ const app = {
             window.scrollTo(0, 0);
 
             // Special subview rendering
-            if (viewId === 'browse') {
+            if (viewId === 'home') {
+                this.renderAnnouncementsBanner();
+                this.renderEventsBanner();
+            } else if (viewId === 'browse') {
                 this.renderProducts();
                 if (this.showWishlistOnly) {
                     this.filterListings();
@@ -4099,6 +4232,1027 @@ const app = {
 
         localStorage.setItem(buyerInboxKey, JSON.stringify(buyerInbox));
         localStorage.setItem(sellerInboxKey, JSON.stringify(sellerInbox));
+    },
+
+    // === ADMIN DASHBOARD ACTIONS ===
+    loadAdminTab(tabName) {
+        this.currentAdminTab = tabName;
+        const tabs = ['overview', 'events', 'announcements', 'users'];
+        tabs.forEach(t => {
+            const btn = document.getElementById(`admin-tab-${t}`);
+            if (btn) {
+                if (t === tabName) {
+                    btn.style.background = 'rgba(245, 200, 66, 0.08)';
+                    btn.style.color = '#f5c842';
+                    btn.style.borderLeft = '3px solid #f5c842';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#8b8b9a';
+                    btn.style.borderLeft = '3px solid transparent';
+                }
+            }
+        });
+
+        if (tabName === 'overview') {
+            this.renderAdminOverview();
+        } else if (tabName === 'events') {
+            this.renderAdminEvents();
+        } else if (tabName === 'announcements') {
+            this.renderAdminAnnouncements();
+        } else if (tabName === 'users') {
+            this.renderAdminUsers();
+        }
+    },
+
+    openAdminModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    },
+
+    closeAdminModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        // Reset forms if applicable
+        if (modalId === 'admin-event-modal') {
+            document.getElementById('admin-event-form').reset();
+            document.getElementById('admin-event-id').value = '';
+            document.getElementById('admin-event-modal-title').textContent = 'New Event';
+            document.getElementById('admin-event-submit-btn').textContent = 'Create Event';
+        } else if (modalId === 'admin-announcement-modal') {
+            document.getElementById('admin-announcement-form').reset();
+            document.getElementById('admin-announcement-id').value = '';
+            document.getElementById('admin-announcement-modal-title').textContent = 'New Announcement';
+            document.getElementById('admin-announcement-submit-btn').textContent = 'Post Announcement';
+        }
+    },
+
+    renderAdminOverview() {
+        const container = document.getElementById('admin-main-content');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="animation: fadeIn 0.25s ease;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 26px; font-weight: 700; color: #f0f0f4; margin: 0;">Dashboard Overview</h1>
+                    <p style="font-size: 14px; color: #8b8b9a; margin: 4px 0 0 0;">Quick statistics and health of the CampusLink application platform.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; margin-bottom: 40px;">
+                    <div style="background: #131316; border: 1px solid #2a2a33; border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 600; color: #8b8b9a; text-transform: uppercase; letter-spacing: 0.05em;">Total Users</div>
+                            <div style="font-size: 32px; font-weight: 700; color: #f0f0f4; margin-top: 8px; font-family: 'JetBrains Mono', monospace;" id="admin-stat-users">-</div>
+                        </div>
+                        <div style="background: rgba(108, 99, 255, 0.1); width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6C63FF;">
+                            <i data-lucide="users" style="width: 24px; height: 24px;"></i>
+                        </div>
+                    </div>
+
+                    <div style="background: #131316; border: 1px solid #2a2a33; border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 600; color: #8b8b9a; text-transform: uppercase; letter-spacing: 0.05em;">Marketplace Listings</div>
+                            <div style="font-size: 32px; font-weight: 700; color: #f0f0f4; margin-top: 8px; font-family: 'JetBrains Mono', monospace;" id="admin-stat-listings">-</div>
+                        </div>
+                        <div style="background: rgba(245, 200, 66, 0.1); width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #f5c842;">
+                            <i data-lucide="shopping-bag" style="width: 24px; height: 24px;"></i>
+                        </div>
+                    </div>
+
+                    <div style="background: #131316; border: 1px solid #2a2a33; border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 600; color: #8b8b9a; text-transform: uppercase; letter-spacing: 0.05em;">Active Teams</div>
+                            <div style="font-size: 32px; font-weight: 700; color: #f0f0f4; margin-top: 8px; font-family: 'JetBrains Mono', monospace;" id="admin-stat-teams">-</div>
+                        </div>
+                        <div style="background: rgba(108, 99, 255, 0.1); width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6C63FF;">
+                            <i data-lucide="users-2" style="width: 24px; height: 24px;"></i>
+                        </div>
+                    </div>
+
+                    <div style="background: #131316; border: 1px solid #2a2a33; border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 600; color: #8b8b9a; text-transform: uppercase; letter-spacing: 0.05em;">Forum Threads</div>
+                            <div style="font-size: 32px; font-weight: 700; color: #f0f0f4; margin-top: 8px; font-family: 'JetBrains Mono', monospace;" id="admin-stat-posts">-</div>
+                        </div>
+                        <div style="background: rgba(245, 200, 66, 0.1); width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #f5c842;">
+                            <i data-lucide="message-square" style="width: 24px; height: 24px;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #131316; border: 1px solid #2a2a33; border-radius: 12px; padding: 28px;">
+                    <h3 style="font-size: 18px; font-weight: 700; color: #f0f0f4; margin: 0 0 8px 0;">Admin Actions Quickstart</h3>
+                    <p style="font-size: 14px; color: #8b8b9a; margin: 0 0 24px 0;">Use the sidebar console or shortcut buttons below to quickly manage events and notifications.</p>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        <button onclick="app.loadAdminTab('events')" class="admin-btn admin-btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px;">
+                            <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> Manage Events
+                        </button>
+                        <button onclick="app.loadAdminTab('announcements')" class="admin-btn admin-btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; border: 1px solid #2a2a33; color: #f0f0f4;">
+                            <i data-lucide="megaphone" style="width: 16px; height: 16px;"></i> Manage Announcements
+                        </button>
+                        <button onclick="app.loadAdminTab('users')" class="admin-btn admin-btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 12px 20px; border: 1px solid #2a2a33; color: #f0f0f4;">
+                            <i data-lucide="shield-alert" style="width: 16px; height: 16px;"></i> User Roles Manager
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        this.fetchAdminOverviewData();
+    },
+
+    fetchAdminOverviewData() {
+        const usersEl = document.getElementById('admin-stat-users');
+        const listingsEl = document.getElementById('admin-stat-listings');
+        const teamsEl = document.getElementById('admin-stat-teams');
+        const postsEl = document.getElementById('admin-stat-posts');
+
+        if (this.isSupabaseEnabled()) {
+            Promise.all([
+                supabaseClient.from('profiles').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('listings').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('teams').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('reddit_posts').select('*', { count: 'exact', head: true })
+            ]).then(([profilesRes, listingsRes, teamsRes, postsRes]) => {
+                if (usersEl) usersEl.textContent = profilesRes.count !== null ? profilesRes.count : '-';
+                if (listingsEl) listingsEl.textContent = listingsRes.count !== null ? listingsRes.count : '-';
+                if (teamsEl) teamsEl.textContent = teamsRes.count !== null ? teamsRes.count : '-';
+                if (postsEl) postsEl.textContent = postsRes.count !== null ? postsRes.count : '-';
+            }).catch(err => {
+                console.error("Failed to fetch admin overview metrics from Supabase:", err);
+                this.fetchAdminOverviewDataLocally(usersEl, listingsEl, teamsEl, postsEl);
+            });
+        } else {
+            this.fetchAdminOverviewDataLocally(usersEl, listingsEl, teamsEl, postsEl);
+        }
+    },
+
+    fetchAdminOverviewDataLocally(usersEl, listingsEl, teamsEl, postsEl) {
+        const users = JSON.parse(localStorage.getItem('cl_users')) || [];
+        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        const teams = JSON.parse(localStorage.getItem('cl_teams')) || [];
+        const posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
+
+        if (usersEl) usersEl.textContent = users.length;
+        if (listingsEl) listingsEl.textContent = listings.length;
+        if (teamsEl) teamsEl.textContent = teams.length;
+        if (postsEl) postsEl.textContent = posts.length;
+    },
+
+    renderAdminEvents() {
+        const container = document.getElementById('admin-main-content');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="animation: fadeIn 0.25s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                    <div>
+                        <h1 style="font-size: 26px; font-weight: 700; color: #f0f0f4; margin: 0;">Campus Events</h1>
+                        <p style="font-size: 14px; color: #8b8b9a; margin: 4px 0 0 0;">Create, edit, and delete academic/cultural events for the students.</p>
+                    </div>
+                    <button onclick="app.openCreateEventModal()" class="admin-btn admin-btn-primary" style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Add Event
+                    </button>
+                </div>
+
+                <div class="admin-table-container">
+                    <div class="admin-table-row header" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 120px;">
+                        <div>Title / Type</div>
+                        <div>Date & Time</div>
+                        <div>Venue</div>
+                        <div>Status</div>
+                        <div style="text-align: right;">Actions</div>
+                    </div>
+                    <div id="admin-events-list">
+                        <div style="padding: 40px; text-align: center; color: #8b8b9a;">Loading events...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        this.fetchAdminEvents();
+    },
+
+    fetchAdminEvents() {
+        const listEl = document.getElementById('admin-events-list');
+        if (!listEl) return;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('events').select('*').order('date', { ascending: true }).then(({ data, error }) => {
+                if (error) throw error;
+                this.renderEventsList(data || []);
+            }).catch(err => {
+                console.error("Failed to fetch events from Supabase:", err);
+                const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+                this.renderEventsList(localEvents);
+            });
+        } else {
+            const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+            localEvents.sort((a,b) => new Date(a.date) - new Date(b.date));
+            this.renderEventsList(localEvents);
+        }
+    },
+
+    renderEventsList(events) {
+        const listEl = document.getElementById('admin-events-list');
+        if (!listEl) return;
+
+        if (events.length === 0) {
+            listEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b8b9a;">No campus events registered yet.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        events.forEach(evt => {
+            const row = document.createElement('div');
+            row.className = 'admin-table-row';
+            row.style.gridTemplateColumns = '2fr 1.2fr 1fr 1fr 120px';
+
+            const timeStr = evt.time ? evt.time.slice(0, 5) : 'All Day';
+            const isFeaturedBadge = evt.is_featured ? '<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">FEATURED</span>' : '';
+            const typeStr = evt.event_type ? evt.event_type.charAt(0).toUpperCase() + evt.event_type.slice(1) : 'Other';
+
+            row.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; color: #f0f0f4; display: flex; align-items: center; gap: 4px;">
+                        ${evt.title} ${isFeaturedBadge}
+                    </div>
+                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px;">Type: ${typeStr}</div>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; color: #f0f0f4;">
+                    <div>${evt.date}</div>
+                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px;">${timeStr}</div>
+                </div>
+                <div style="color: #f0f0f4;">${evt.venue || 'TBD'}</div>
+                <div>
+                    ${new Date(evt.date) >= new Date().setHours(0,0,0,0) ? '<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600;">Upcoming</span>' : '<span style="background: rgba(255, 255, 255, 0.05); color: #8b8b9a; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600;">Past</span>'}
+                </div>
+                <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+                    <button onclick="app.openEditEventModal('${evt.id}')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#f5c842'" onmouseout="this.style.color='#8b8b9a'" title="Edit Event">
+                        <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                    </button>
+                    <button onclick="app.deleteAdminEvent('${evt.id}')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8b8b9a'" title="Delete Event">
+                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
+
+        if (window.lucide) lucide.createIcons();
+    },
+
+    openCreateEventModal() {
+        document.getElementById('admin-event-modal-title').textContent = 'New Campus Event';
+        document.getElementById('admin-event-submit-btn').textContent = 'Create Event';
+        document.getElementById('admin-event-id').value = '';
+        document.getElementById('admin-event-form').reset();
+        this.openAdminModal('admin-event-modal');
+    },
+
+    openEditEventModal(eventId) {
+        document.getElementById('admin-event-modal-title').textContent = 'Edit Campus Event';
+        document.getElementById('admin-event-submit-btn').textContent = 'Save Changes';
+        document.getElementById('admin-event-id').value = eventId;
+
+        const fillForm = (evt) => {
+            document.getElementById('admin-event-title').value = evt.title || '';
+            document.getElementById('admin-event-date').value = evt.date || '';
+            document.getElementById('admin-event-time').value = evt.time ? evt.time.slice(0, 5) : '';
+            document.getElementById('admin-event-type').value = evt.event_type || 'technical';
+            document.getElementById('admin-event-venue').value = evt.venue || '';
+            document.getElementById('admin-event-description').value = evt.description || '';
+            document.getElementById('admin-event-link').value = evt.registration_link || '';
+            document.getElementById('admin-event-featured').checked = !!evt.is_featured;
+            this.openAdminModal('admin-event-modal');
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('events').select('*').eq('id', eventId).maybeSingle().then(({ data, error }) => {
+                if (error) throw error;
+                if (data) fillForm(data);
+            }).catch(err => {
+                console.error("Failed to load event for editing:", err);
+                const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+                const target = localEvents.find(e => e.id === eventId || e.id == eventId);
+                if (target) fillForm(target);
+            });
+        } else {
+            const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+            const target = localEvents.find(e => e.id === eventId || e.id == eventId);
+            if (target) fillForm(target);
+        }
+    },
+
+    handleAdminEventSubmit(event) {
+        event.preventDefault();
+        
+        const id = document.getElementById('admin-event-id').value;
+        const title = document.getElementById('admin-event-title').value.trim();
+        const date = document.getElementById('admin-event-date').value;
+        const timeInput = document.getElementById('admin-event-time').value;
+        const time = timeInput ? timeInput + ":00" : null;
+        const event_type = document.getElementById('admin-event-type').value;
+        const venue = document.getElementById('admin-event-venue').value.trim();
+        const description = document.getElementById('admin-event-description').value.trim();
+        const registration_link = document.getElementById('admin-event-link').value.trim();
+        const is_featured = document.getElementById('admin-event-featured').checked;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+                const userId = session && session.user ? session.user.id : null;
+                const eventData = {
+                    title,
+                    date,
+                    time,
+                    event_type,
+                    venue: venue || null,
+                    description: description || null,
+                    registration_link: registration_link || null,
+                    is_featured,
+                    updated_at: new Date().toISOString()
+                };
+
+                let promise;
+                if (id) {
+                    promise = supabaseClient.from('events').update(eventData).eq('id', id);
+                } else {
+                    eventData.created_by = userId;
+                    promise = supabaseClient.from('events').insert(eventData);
+                }
+
+                return promise;
+            }).then(({ error }) => {
+                if (error) throw error;
+                this.showToast(id ? "Event updated successfully!" : "Event created successfully!", "success");
+                this.closeAdminModal('admin-event-modal');
+                this.fetchAdminEvents();
+            }).catch(err => {
+                console.error("Failed to save event to Supabase:", err);
+                this.showToast("Failed to save event. Trying local database fallback...", "warning");
+                this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+            });
+        } else {
+            this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+        }
+    },
+
+    handleAdminEventSubmitLocally(id, eventData) {
+        const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+        eventData.updated_at = new Date().toISOString();
+        if (id) {
+            const index = localEvents.findIndex(e => e.id === id || e.id == id);
+            if (index !== -1) {
+                localEvents[index] = { ...localEvents[index], ...eventData };
+            }
+        } else {
+            eventData.id = "local-event-" + Date.now();
+            eventData.created_at = new Date().toISOString();
+            localEvents.push(eventData);
+        }
+        localStorage.setItem('cl_events', JSON.stringify(localEvents));
+        this.showToast(id ? "Event updated locally!" : "Event created locally!", "success");
+        this.closeAdminModal('admin-event-modal');
+        this.fetchAdminEvents();
+    },
+
+    deleteAdminEvent(eventId) {
+        if (!confirm("Are you sure you want to delete this event? This action cannot be undone.")) return;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('events').delete().eq('id', eventId).then(({ error }) => {
+                if (error) throw error;
+                this.showToast("Event deleted successfully!", "info");
+                this.fetchAdminEvents();
+            }).catch(err => {
+                console.error("Failed to delete event from Supabase:", err);
+                this.deleteAdminEventLocally(eventId);
+            });
+        } else {
+            this.deleteAdminEventLocally(eventId);
+        }
+    },
+
+    deleteAdminEventLocally(eventId) {
+        const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+        const updated = localEvents.filter(e => e.id !== eventId && e.id != eventId);
+        localStorage.setItem('cl_events', JSON.stringify(updated));
+        this.showToast("Event deleted locally!", "info");
+        this.fetchAdminEvents();
+    },
+
+    renderAdminAnnouncements() {
+        const container = document.getElementById('admin-main-content');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="animation: fadeIn 0.25s ease;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                    <div>
+                        <h1 style="font-size: 26px; font-weight: 700; color: #f0f0f4; margin: 0;">Campus Announcements</h1>
+                        <p style="font-size: 14px; color: #8b8b9a; margin: 4px 0 0 0;">Publish emergency banners or notifications directly on the student home feed.</p>
+                    </div>
+                    <button onclick="app.openCreateAnnouncementModal()" class="admin-btn admin-btn-primary" style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Add Announcement
+                    </button>
+                </div>
+
+                <div class="admin-table-container">
+                    <div class="admin-table-row header" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 120px;">
+                        <div>Title / Priority</div>
+                        <div>Posted Date</div>
+                        <div>Expiration</div>
+                        <div>Status</div>
+                        <div style="text-align: right;">Actions</div>
+                    </div>
+                    <div id="admin-announcements-list">
+                        <div style="padding: 40px; text-align: center; color: #8b8b9a;">Loading announcements...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        this.fetchAdminAnnouncements();
+    },
+
+    fetchAdminAnnouncements() {
+        const listEl = document.getElementById('admin-announcements-list');
+        if (!listEl) return;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('announcements').select('*').order('created_at', { ascending: false }).then(({ data, error }) => {
+                if (error) throw error;
+                this.renderAnnouncementsList(data || []);
+            }).catch(err => {
+                console.error("Failed to fetch announcements from Supabase:", err);
+                const localAnn = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+                this.renderAnnouncementsList(localAnn);
+            });
+        } else {
+            const localAnn = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+            localAnn.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+            this.renderAnnouncementsList(localAnn);
+        }
+    },
+
+    renderAnnouncementsList(anns) {
+        const listEl = document.getElementById('admin-announcements-list');
+        if (!listEl) return;
+
+        if (anns.length === 0) {
+            listEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b8b9a;">No announcements posted yet.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        anns.forEach(ann => {
+            const row = document.createElement('div');
+            row.className = 'admin-table-row';
+            row.style.gridTemplateColumns = '2fr 1.2fr 1fr 1fr 120px';
+
+            const createdDate = new Date(ann.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+            const expiresStr = ann.expires_at ? new Date(ann.expires_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never';
+            
+            let priorityBadge = '';
+            if (ann.priority === 'urgent') {
+                priorityBadge = '<span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">URGENT</span>';
+            } else if (ann.priority === 'high') {
+                priorityBadge = '<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">HIGH</span>';
+            } else if (ann.priority === 'normal') {
+                priorityBadge = '<span style="background: rgba(108, 99, 255, 0.15); color: #6C63FF; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">NORMAL</span>';
+            } else {
+                priorityBadge = '<span style="background: rgba(255, 255, 255, 0.05); color: #8b8b9a; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">LOW</span>';
+            }
+
+            const isExpired = ann.expires_at ? new Date(ann.expires_at) < new Date() : false;
+            let statusBadge = '';
+            if (!ann.is_active) {
+                statusBadge = '<span style="background: rgba(255, 255, 255, 0.05); color: #8b8b9a; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600;">Inactive</span>';
+            } else if (isExpired) {
+                statusBadge = '<span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600;">Expired</span>';
+            } else {
+                statusBadge = '<span style="background: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600;">Active</span>';
+            }
+
+            const activeIcon = ann.is_active ? 'eye' : 'eye-off';
+            const toggleTitle = ann.is_active ? 'Deactivate Announcement' : 'Activate Announcement';
+
+            row.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; color: #f0f0f4; display: flex; align-items: center;">${ann.title} ${priorityBadge}</div>
+                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">${ann.body}</div>
+                </div>
+                <div style="font-family: 'JetBrains Mono', monospace; color: #f0f0f4;">${createdDate}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; color: #f0f0f4; font-size: 12px;">${expiresStr}</div>
+                <div>${statusBadge}</div>
+                <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+                    <button onclick="app.toggleAdminAnnouncementStatus('${ann.id}', ${ann.is_active})" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#f5c842'" onmouseout="this.style.color='#8b8b9a'" title="${toggleTitle}">
+                        <i data-lucide="${activeIcon}" style="width: 16px; height: 16px;"></i>
+                    </button>
+                    <button onclick="app.openEditAnnouncementModal('${ann.id}')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#f5c842'" onmouseout="this.style.color='#8b8b9a'" title="Edit Details">
+                        <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+                    </button>
+                    <button onclick="app.deleteAdminAnnouncement('${ann.id}')" style="background: none; border: none; cursor: pointer; color: #8b8b9a; padding: 6px;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#8b8b9a'" title="Delete Notice">
+                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
+
+        if (window.lucide) lucide.createIcons();
+    },
+
+    openCreateAnnouncementModal() {
+        document.getElementById('admin-announcement-modal-title').textContent = 'New Campus Announcement';
+        document.getElementById('admin-announcement-submit-btn').textContent = 'Post Announcement';
+        document.getElementById('admin-announcement-id').value = '';
+        document.getElementById('admin-announcement-form').reset();
+        document.getElementById('admin-announcement-active').checked = true;
+        this.openAdminModal('admin-announcement-modal');
+    },
+
+    openEditAnnouncementModal(annId) {
+        document.getElementById('admin-announcement-modal-title').textContent = 'Edit Announcement';
+        document.getElementById('admin-announcement-submit-btn').textContent = 'Save Changes';
+        document.getElementById('admin-announcement-id').value = annId;
+
+        const fillForm = (ann) => {
+            document.getElementById('admin-announcement-title').value = ann.title || '';
+            document.getElementById('admin-announcement-body').value = ann.body || '';
+            document.getElementById('admin-announcement-priority').value = ann.priority || 'normal';
+            document.getElementById('admin-announcement-active').checked = !!ann.is_active;
+            
+            if (ann.expires_at) {
+                const d = new Date(ann.expires_at);
+                const pad = (n) => String(n).padStart(2, '0');
+                const localStr = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                document.getElementById('admin-announcement-expires').value = localStr;
+            } else {
+                document.getElementById('admin-announcement-expires').value = '';
+            }
+
+            this.openAdminModal('admin-announcement-modal');
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('announcements').select('*').eq('id', annId).maybeSingle().then(({ data, error }) => {
+                if (error) throw error;
+                if (data) fillForm(data);
+            }).catch(err => {
+                console.error("Failed to load announcement for editing:", err);
+                const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+                const target = localAnns.find(a => a.id === annId || a.id == annId);
+                if (target) fillForm(target);
+            });
+        } else {
+            const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+            const target = localAnns.find(a => a.id === annId || a.id == annId);
+            if (target) fillForm(target);
+        }
+    },
+
+    handleAdminAnnouncementSubmit(event) {
+        event.preventDefault();
+
+        const id = document.getElementById('admin-announcement-id').value;
+        const title = document.getElementById('admin-announcement-title').value.trim();
+        const body = document.getElementById('admin-announcement-body').value.trim();
+        const priority = document.getElementById('admin-announcement-priority').value;
+        const is_active = document.getElementById('admin-announcement-active').checked;
+        const expiresVal = document.getElementById('admin-announcement-expires').value;
+        const expires_at = expiresVal ? new Date(expiresVal).toISOString() : null;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.auth.getSession().then(({ data: { session } }) => {
+                const userId = session && session.user ? session.user.id : null;
+                const annData = {
+                    title,
+                    body,
+                    priority,
+                    is_active,
+                    expires_at
+                };
+
+                let promise;
+                if (id) {
+                    promise = supabaseClient.from('announcements').update(annData).eq('id', id);
+                } else {
+                    annData.created_by = userId;
+                    promise = supabaseClient.from('announcements').insert(annData);
+                }
+
+                return promise;
+            }).then(({ error }) => {
+                if (error) throw error;
+                this.showToast(id ? "Announcement saved!" : "Announcement published!", "success");
+                this.closeAdminModal('admin-announcement-modal');
+                this.fetchAdminAnnouncements();
+            }).catch(err => {
+                console.error("Failed to save announcement to Supabase:", err);
+                this.showToast("Failed to write to Cloud. Writing locally...", "warning");
+                this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
+            });
+        } else {
+            this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
+        }
+    },
+
+    handleAdminAnnouncementSubmitLocally(id, annData) {
+        const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+        if (id) {
+            const index = localAnns.findIndex(a => a.id === id || a.id == id);
+            if (index !== -1) {
+                localAnns[index] = { ...localAnns[index], ...annData };
+            }
+        } else {
+            annData.id = "local-ann-" + Date.now();
+            annData.created_at = new Date().toISOString();
+            localAnns.push(annData);
+        }
+        localStorage.setItem('cl_announcements', JSON.stringify(localAnns));
+        this.showToast(id ? "Announcement saved locally!" : "Announcement posted locally!", "success");
+        this.closeAdminModal('admin-announcement-modal');
+        this.fetchAdminAnnouncements();
+    },
+
+    toggleAdminAnnouncementStatus(annId, currentVal) {
+        const newVal = !currentVal;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('announcements').update({ is_active: newVal }).eq('id', annId).then(({ error }) => {
+                if (error) throw error;
+                this.showToast(newVal ? "Announcement activated" : "Announcement deactivated", "success");
+                this.fetchAdminAnnouncements();
+            }).catch(err => {
+                console.error("Failed to toggle announcement in Supabase:", err);
+                this.toggleAdminAnnouncementStatusLocally(annId, newVal);
+            });
+        } else {
+            this.toggleAdminAnnouncementStatusLocally(annId, newVal);
+        }
+    },
+
+    toggleAdminAnnouncementStatusLocally(annId, newVal) {
+        const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+        const index = localAnns.findIndex(a => a.id === annId || a.id == annId);
+        if (index !== -1) {
+            localAnns[index].is_active = newVal;
+        }
+        localStorage.setItem('cl_announcements', JSON.stringify(localAnns));
+        this.showToast(newVal ? "Announcement activated locally" : "Announcement deactivated locally", "success");
+        this.fetchAdminAnnouncements();
+    },
+
+    deleteAdminAnnouncement(annId) {
+        if (!confirm("Are you sure you want to delete this announcement notice?")) return;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('announcements').delete().eq('id', annId).then(({ error }) => {
+                if (error) throw error;
+                this.showToast("Announcement deleted successfully!", "info");
+                this.fetchAdminAnnouncements();
+            }).catch(err => {
+                console.error("Failed to delete notice from Supabase:", err);
+                this.deleteAdminAnnouncementLocally(annId);
+            });
+        } else {
+            this.deleteAdminAnnouncementLocally(annId);
+        }
+    },
+
+    deleteAdminAnnouncementLocally(annId) {
+        const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+        const updated = localAnns.filter(a => a.id !== annId && a.id != annId);
+        localStorage.setItem('cl_announcements', JSON.stringify(updated));
+        this.showToast("Announcement deleted locally!", "info");
+        this.fetchAdminAnnouncements();
+    },
+
+    renderAdminUsers() {
+        const container = document.getElementById('admin-main-content');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="animation: fadeIn 0.25s ease;">
+                <div style="margin-bottom: 32px;">
+                    <h1 style="font-size: 26px; font-weight: 700; color: #f0f0f4; margin: 0;">User Role Manager</h1>
+                    <p style="font-size: 14px; color: #8b8b9a; margin: 4px 0 0 0;">Promote students to administrator access or demote admin privileges.</p>
+                </div>
+
+                <div style="margin-bottom: 24px; display: flex; gap: 12px; max-width: 480px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="text" id="admin-user-search" class="admin-form-control" placeholder="Search by name or email..." style="padding-left: 36px;" oninput="app.fetchAdminUsers(this.value)">
+                        <i data-lucide="search" style="position: absolute; left: 12px; top: 12px; width: 16px; height: 16px; color: #8b8b9a;"></i>
+                    </div>
+                </div>
+
+                <div class="admin-table-container">
+                    <div class="admin-table-row header" style="grid-template-columns: 2fr 1.2fr 1fr 1fr 120px;">
+                        <div>Name / Email</div>
+                        <div>Branch</div>
+                        <div>Semester</div>
+                        <div>Role</div>
+                        <div style="text-align: right;">Action</div>
+                    </div>
+                    <div id="admin-users-list">
+                        <div style="padding: 40px; text-align: center; color: #8b8b9a;">Loading user accounts...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        this.fetchAdminUsers();
+    },
+
+    fetchAdminUsers(searchQuery = "") {
+        const listEl = document.getElementById('admin-users-list');
+        if (!listEl) return;
+
+        const cleanQuery = searchQuery.toLowerCase().trim();
+
+        if (this.isSupabaseEnabled()) {
+            Promise.all([
+                supabaseClient.from('users').select('*'),
+                supabaseClient.from('profiles').select('email, role')
+            ]).then(([usersRes, profilesRes]) => {
+                if (usersRes.error) throw usersRes.error;
+                
+                const profilesMap = {};
+                (profilesRes.data || []).forEach(p => {
+                    profilesMap[p.email] = p.role || 'student';
+                });
+
+                const unifiedUsers = (usersRes.data || []).map(u => ({
+                    ...u,
+                    role: profilesMap[u.email] || 'student'
+                }));
+
+                const filtered = unifiedUsers.filter(u => 
+                    u.name.toLowerCase().includes(cleanQuery) || 
+                    u.email.toLowerCase().includes(cleanQuery)
+                );
+
+                this.renderUsersList(filtered);
+            }).catch(err => {
+                console.error("Failed to fetch users from Supabase:", err);
+                this.fetchAdminUsersLocally(cleanQuery);
+            });
+        } else {
+            this.fetchAdminUsersLocally(cleanQuery);
+        }
+    },
+
+    fetchAdminUsersLocally(cleanQuery = "") {
+        const localUsers = JSON.parse(localStorage.getItem('cl_users')) || [];
+        
+        const filtered = localUsers.map(u => {
+            if (!u.role) {
+                u.role = (u.email === 'admin@vvce.ac.in' || u.email === 'vvce25cse0197@vvce.ac.in') ? 'admin' : 'student';
+            }
+            return u;
+        }).filter(u => 
+            u.name.toLowerCase().includes(cleanQuery) || 
+            u.email.toLowerCase().includes(cleanQuery)
+        );
+
+        this.renderUsersList(filtered);
+    },
+
+    renderUsersList(users) {
+        const listEl = document.getElementById('admin-users-list');
+        if (!listEl) return;
+
+        if (users.length === 0) {
+            listEl.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b8b9a;">No user accounts match your search.</div>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        users.forEach(u => {
+            const row = document.createElement('div');
+            row.className = 'admin-table-row';
+            row.style.gridTemplateColumns = '2fr 1.2fr 1fr 1fr 120px';
+
+            const roleBadge = u.role === 'admin' 
+                ? '<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 700;">Administrator</span>'
+                : '<span style="background: rgba(108, 99, 255, 0.1); color: #6C63FF; font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 600;">Student</span>';
+
+            const buttonText = u.role === 'admin' ? 'Demote' : 'Promote';
+            const buttonColor = u.role === 'admin' ? '#ef4444' : '#f5c842';
+            
+            const isSelf = u.email === this.currentUser.email;
+            const isSystemOwner = u.email === 'vvce25cse0197@vvce.ac.in';
+            const disableAction = (isSelf || isSystemOwner) ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : '';
+
+            row.innerHTML = `
+                <div>
+                    <div style="font-weight: 600; color: #f0f0f4;">${u.name}</div>
+                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px; font-family: 'JetBrains Mono', monospace;">${u.email}</div>
+                </div>
+                <div style="color: #f0f0f4;">${u.branch || 'CSE'}</div>
+                <div style="color: #f0f0f4;">Sem ${u.semester || '6'}</div>
+                <div>${roleBadge}</div>
+                <div style="text-align: right;">
+                    <button ${disableAction} onclick="app.toggleAdminUserRole('${u.email}', '${u.role}')" class="admin-btn" style="padding: 6px 12px; font-size: 12px; background: transparent; border: 1px solid ${buttonColor}; color: ${buttonColor}; font-weight: 600; transition: all 0.15s ease;" onmouseover="if(!this.disabled){this.style.background='${buttonColor}'; this.style.color='#0d0d0f'}" onmouseout="if(!this.disabled){this.style.background='transparent'; this.style.color='${buttonColor}'}">
+                        ${buttonText}
+                    </button>
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
+
+        if (window.lucide) lucide.createIcons();
+    },
+
+    toggleAdminUserRole(email, currentRole) {
+        const newRole = currentRole === 'admin' ? 'student' : 'admin';
+        const actionStr = newRole === 'admin' ? 'promote this user to Administrator' : 'demote this administrator to Student';
+        
+        if (!confirm(`Are you sure you want to ${actionStr}?`)) return;
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('profiles').update({ role: newRole }).eq('email', email).then(({ error }) => {
+                if (error) throw error;
+                this.showToast(`User role successfully changed to ${newRole}!`, "success");
+                this.fetchAdminUsers(document.getElementById('admin-user-search')?.value || "");
+            }).catch(err => {
+                console.error("Failed to alter profile role in Supabase:", err);
+                this.toggleAdminUserRoleLocally(email, newRole);
+            });
+        } else {
+            this.toggleAdminUserRoleLocally(email, newRole);
+        }
+    },
+
+    toggleAdminUserRoleLocally(email, newRole) {
+        const localUsers = JSON.parse(localStorage.getItem('cl_users')) || [];
+        const index = localUsers.findIndex(u => u.email === email);
+        if (index !== -1) {
+            localUsers[index].role = newRole;
+            localStorage.setItem('cl_users', JSON.stringify(localUsers));
+            this.showToast(`User role locally changed to ${newRole}!`, "success");
+        } else {
+            this.showToast("User not found locally.", "error");
+        }
+        this.fetchAdminUsers(document.getElementById('admin-user-search')?.value || "");
+    },
+
+    renderAnnouncementsBanner() {
+        const container = document.getElementById('announcements-banner-container');
+        if (!container) return;
+
+        const dismissals = JSON.parse(sessionStorage.getItem('cl_dismissed_announcements') || '[]');
+
+        const renderAnns = (list) => {
+            const activeList = list.filter(ann => {
+                if (!ann.is_active) return false;
+                if (dismissals.includes(ann.id) || dismissals.includes(String(ann.id))) return false;
+                if (ann.expires_at && new Date(ann.expires_at) < new Date()) return false;
+                return true;
+            });
+
+            if (activeList.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'block';
+            container.innerHTML = '';
+
+            activeList.forEach(ann => {
+                const card = document.createElement('div');
+                card.className = `announcements-banner-card ${ann.priority || 'normal'}`;
+                
+                let iconName = 'info';
+                if (ann.priority === 'urgent') iconName = 'alert-triangle';
+                else if (ann.priority === 'high') iconName = 'megaphone';
+                else if (ann.priority === 'low') iconName = 'bell-off';
+
+                card.innerHTML = `
+                    <i data-lucide="${iconName}" class="banner-icon" style="width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px;"></i>
+                    <div style="flex: 1;">
+                        <h4 style="font-weight: 700; font-size: 14px; margin: 0; display: flex; align-items: center; gap: 8px;">
+                            ${ann.title}
+                            <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; opacity: 0.6; font-family: 'JetBrains Mono', monospace;">Notice</span>
+                        </h4>
+                        <p style="font-size: 13px; margin: 6px 0 0 0; line-height: 1.4; opacity: 0.85;">${ann.body}</p>
+                    </div>
+                    <button onclick="app.dismissAnnouncement('${ann.id}')" style="background: none; border: none; cursor: pointer; color: inherit; padding: 4px; opacity: 0.6; align-self: flex-start; transition: opacity 0.15s ease;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" title="Dismiss Notice">
+                        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('announcements').select('*').eq('is_active', true).then(({ data, error }) => {
+                if (error) throw error;
+                renderAnns(data || []);
+            }).catch(err => {
+                console.error("Failed to load announcements for banner:", err);
+                const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+                renderAnns(localAnns);
+            });
+        } else {
+            const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+            renderAnns(localAnns);
+        }
+    },
+
+    dismissAnnouncement(annId) {
+        const dismissals = JSON.parse(sessionStorage.getItem('cl_dismissed_announcements') || '[]');
+        dismissals.push(annId);
+        sessionStorage.setItem('cl_dismissed_announcements', JSON.stringify(dismissals));
+        this.renderAnnouncementsBanner();
+    },
+
+    renderEventsBanner() {
+        const container = document.getElementById('events-banner-container');
+        if (!container) return;
+
+        const renderEvts = (list) => {
+            const featuredList = list.filter(evt => {
+                if (!evt.is_featured) return false;
+                const eventDate = new Date(evt.date);
+                eventDate.setHours(23, 59, 59, 999);
+                return eventDate >= new Date();
+            });
+
+            if (featuredList.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #f5c842; letter-spacing: 0.05em; text-transform: uppercase;">Featured Events</span>
+                    <div style="flex: 1; height: 1px; background: linear-gradient(90deg, #2a2a33, transparent);"></div>
+                </div>
+                <div class="events-banner-list"></div>
+            `;
+
+            const listWrapper = container.querySelector('.events-banner-list');
+
+            featuredList.forEach(evt => {
+                const card = document.createElement('div');
+                card.className = 'events-banner-card';
+
+                const timeStr = evt.time ? evt.time.slice(0, 5) : 'All Day';
+                const regLinkHtml = evt.registration_link 
+                    ? `<a href="${evt.registration_link}" target="_blank" class="admin-btn admin-btn-primary" style="padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block;" onclick="event.stopPropagation();">Register Now</a>` 
+                    : `<span style="font-size: 12px; color: #8b8b9a; font-weight: 500;">No link required</span>`;
+
+                card.innerHTML = `
+                    <div style="background: rgba(245, 200, 66, 0.08); width: 44px; height: 44px; border-radius: 8px; display: flex; flex-shrink: 0; align-items: center; justify-content: center; color: #f5c842;">
+                        <i data-lucide="calendar-heart" style="width: 22px; height: 22px;"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 700; font-size: 13.5px; color: #f0f0f4; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">${evt.title}</div>
+                        <div style="font-size: 11.5px; color: #8b8b9a; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;">
+                            <span style="font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="calendar" style="width: 12px; height: 12px;"></i> ${evt.date}
+                            </span>
+                            <span style="font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="clock" style="width: 12px; height: 12px;"></i> ${timeStr}
+                            </span>
+                            <span style="display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${evt.venue || 'TBD'}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="flex-shrink: 0;">
+                        ${regLinkHtml}
+                    </div>
+                `;
+                listWrapper.appendChild(card);
+            });
+
+            if (window.lucide) lucide.createIcons();
+        };
+
+        if (this.isSupabaseEnabled()) {
+            supabaseClient.from('events').select('*').eq('is_featured', true).then(({ data, error }) => {
+                if (error) throw error;
+                renderEvts(data || []);
+            }).catch(err => {
+                console.error("Failed to load events for banner:", err);
+                const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+                renderEvts(localEvents);
+            });
+        } else {
+            const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+            renderEvts(localEvents);
+        }
     }
 };
 
