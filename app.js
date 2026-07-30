@@ -4312,13 +4312,19 @@ const app = {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.style.display = 'flex';
+            requestAnimationFrame(() => {
+                modal.classList.add('active');
+            });
         }
     },
 
     closeAdminModal(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
-            modal.style.display = 'none';
+            modal.classList.remove('active');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
         }
         // Reset forms if applicable
         if (modalId === 'admin-event-modal') {
