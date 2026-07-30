@@ -2865,6 +2865,22 @@ const app = {
             this.closeAllDropdowns();
         });
 
+        // Admin Event Form submit listener
+        const adminEventForm = document.getElementById('admin-event-form');
+        if (adminEventForm) {
+            adminEventForm.addEventListener('submit', (e) => {
+                this.handleAdminEventSubmit(e);
+            });
+        }
+
+        // Admin Announcement Form submit listener
+        const adminAnnForm = document.getElementById('admin-announcement-form');
+        if (adminAnnForm) {
+            adminAnnForm.addEventListener('submit', (e) => {
+                this.handleAdminAnnouncementSubmit(e);
+            });
+        }
+
         // Sign In submit
         const signinForm = document.getElementById('signin-form');
         if (signinForm) {
@@ -5636,6 +5652,9 @@ const app = {
     },
 
 };
+
+// Make app instance globally accessible on window object
+window.app = app;
 
 // Start application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
