@@ -546,67 +546,16 @@ const app = {
             localStorage.setItem('cl_offers', JSON.stringify(mockOffers));
         }
 
-        // Mock Events
-        if (!localStorage.getItem('cl_events')) {
-            const mockEvents = [
-                {
-                    id: "mock-event-1",
-                    title: "Technovanza 2026",
-                    description: "Annual national level technical festival at Vidyavardhaka College of Engineering.",
-                    event_type: "technical",
-                    date: "2026-07-15",
-                    time: "09:30",
-                    venue: "VVCE Campus Main Auditorium",
-                    registration_link: "https://vvce.ac.in",
-                    is_featured: true,
-                    created_by: "mock-admin-uuid",
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                },
-                {
-                    id: "mock-event-2",
-                    title: "VVCE Hackfest 2026",
-                    description: "24-hour coding marathon to solve real-world industry problems.",
-                    event_type: "hackathon",
-                    date: "2026-08-05",
-                    time: "10:00",
-                    venue: "CSE Sem Hall / Labs",
-                    registration_link: "https://vvce.ac.in",
-                    is_featured: true,
-                    created_by: "mock-admin-uuid",
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }
-            ];
-            localStorage.setItem('cl_events', JSON.stringify(mockEvents));
-        }
+        // Clean up legacy mock events & announcements from localStorage
+        try {
+            const storedEvts = JSON.parse(localStorage.getItem('cl_events') || '[]');
+            const cleanEvts = storedEvts.filter(e => e && e.id !== 'mock-event-1' && e.id !== 'mock-event-2');
+            localStorage.setItem('cl_events', JSON.stringify(cleanEvts));
 
-        // Mock Announcements
-        if (!localStorage.getItem('cl_announcements')) {
-            const mockAnnouncements = [
-                {
-                    id: "mock-announcement-1",
-                    title: "Final Semester Exam Schedule Released",
-                    body: "The final semester exam schedule for all branches has been uploaded to the official portal. Exams commence from July 10th. Please check your respective notice boards for seat layout details.",
-                    priority: "high",
-                    is_active: true,
-                    expires_at: "2026-07-20T23:59:59.000Z",
-                    created_by: "mock-admin-uuid",
-                    created_at: new Date().toISOString()
-                },
-                {
-                    id: "mock-announcement-2",
-                    title: "Main Campus WiFi Maintenance",
-                    body: "The college Wi-Fi network will undergo routine security updates and maintenance on Sunday, June 28th, from 9:00 AM to 3:00 PM. Access may be intermittent during this window.",
-                    priority: "normal",
-                    is_active: true,
-                    expires_at: "2026-06-29T00:00:00.000Z",
-                    created_by: "mock-admin-uuid",
-                    created_at: new Date().toISOString()
-                }
-            ];
-            localStorage.setItem('cl_announcements', JSON.stringify(mockAnnouncements));
-        }
+            const storedAnns = JSON.parse(localStorage.getItem('cl_announcements') || '[]');
+            const cleanAnns = storedAnns.filter(a => a && a.id !== 'mock-announcement-1' && a.id !== 'mock-announcement-2');
+            localStorage.setItem('cl_announcements', JSON.stringify(cleanAnns));
+        } catch (_) {}
     },
 
     // 2. SESSION & SECURITY GUARD
@@ -5205,6 +5154,7 @@ const app = {
             const combinedList = Array.from(map.values());
 
             const activeList = combinedList.filter(ann => {
+                if (!ann || ann.id === 'mock-announcement-1' || ann.id === 'mock-announcement-2') return false;
                 if (ann.is_active === false) return false;
                 if (dismissals.includes(ann.id) || dismissals.includes(String(ann.id))) return false;
                 if (ann.expires_at && new Date(ann.expires_at) < new Date()) return false;
@@ -5286,6 +5236,7 @@ const app = {
             const combinedList = Array.from(map.values());
 
             const upcomingList = combinedList.filter(evt => {
+                if (!evt || evt.id === 'mock-event-1' || evt.id === 'mock-event-2') return false;
                 if (!evt.date) return false;
                 const eventDate = new Date(evt.date);
                 eventDate.setHours(23, 59, 59, 999);
