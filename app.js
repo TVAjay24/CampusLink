@@ -4578,6 +4578,13 @@ const app = {
     handleAdminEventSubmit(event) {
         event.preventDefault();
         
+        const submitBtn = document.getElementById('admin-event-submit-btn');
+        const origBtnText = submitBtn ? submitBtn.textContent : 'Create Event';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+        }
+
         const id = document.getElementById('admin-event-id').value;
         const title = document.getElementById('admin-event-title').value.trim();
         const date = document.getElementById('admin-event-date').value;
@@ -4586,8 +4593,18 @@ const app = {
         const event_type = document.getElementById('admin-event-type').value;
         const venue = document.getElementById('admin-event-venue').value.trim();
         const description = document.getElementById('admin-event-description').value.trim();
-        const registration_link = document.getElementById('admin-event-link').value.trim();
+        let registration_link = document.getElementById('admin-event-link').value.trim();
+        if (registration_link && !/^https?:\/\//i.test(registration_link)) {
+            registration_link = 'https://' + registration_link;
+        }
         const is_featured = document.getElementById('admin-event-featured').checked;
+
+        const resetBtn = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = origBtnText;
+            }
+        };
 
         if (this.isSupabaseEnabled()) {
             supabaseClient.auth.getSession().then(({ data: { session } }) => {
@@ -4614,16 +4631,19 @@ const app = {
 
                 return promise;
             }).then(({ error }) => {
+                resetBtn();
                 if (error) throw error;
                 this.showToast(id ? "Event updated successfully!" : "Event created successfully!", "success");
                 this.closeAdminModal('admin-event-modal');
                 this.fetchAdminEvents();
             }).catch(err => {
+                resetBtn();
                 console.error("Failed to save event to Supabase:", err);
                 this.showToast("Failed to save event. Trying local database fallback...", "warning");
                 this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
             });
         } else {
+            resetBtn();
             this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
         }
     },
@@ -4846,6 +4866,13 @@ const app = {
     handleAdminAnnouncementSubmit(event) {
         event.preventDefault();
 
+        const submitBtn = document.getElementById('admin-announcement-submit-btn');
+        const origBtnText = submitBtn ? submitBtn.textContent : 'Post Announcement';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+        }
+
         const id = document.getElementById('admin-announcement-id').value;
         const title = document.getElementById('admin-announcement-title').value.trim();
         const body = document.getElementById('admin-announcement-body').value.trim();
@@ -4853,6 +4880,13 @@ const app = {
         const is_active = document.getElementById('admin-announcement-active').checked;
         const expiresVal = document.getElementById('admin-announcement-expires').value;
         const expires_at = expiresVal ? new Date(expiresVal).toISOString() : null;
+
+        const resetBtn = () => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = origBtnText;
+            }
+        };
 
         if (this.isSupabaseEnabled()) {
             supabaseClient.auth.getSession().then(({ data: { session } }) => {
@@ -4875,16 +4909,19 @@ const app = {
 
                 return promise;
             }).then(({ error }) => {
+                resetBtn();
                 if (error) throw error;
                 this.showToast(id ? "Announcement saved!" : "Announcement published!", "success");
                 this.closeAdminModal('admin-announcement-modal');
                 this.fetchAdminAnnouncements();
             }).catch(err => {
+                resetBtn();
                 console.error("Failed to save announcement to Supabase:", err);
                 this.showToast("Failed to write to Cloud. Writing locally...", "warning");
                 this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
             });
         } else {
+            resetBtn();
             this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
         }
     },
