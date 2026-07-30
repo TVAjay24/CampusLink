@@ -55,10 +55,50 @@ const app = {
     activeChatEmail: null,
     activeChatChannel: null,
     activeProfileTab: 'listings',
+    myListingsTab: 'active',
     
     // Reddit states
     activeSubreddit: 'all',
     activeRedditSort: 'hot',
+
+    async cleanupSoldListings() {
+        const now = Date.now();
+        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+        if (this.isSupabaseEnabled()) {
+            try {
+                const { data: soldItems, error } = await supabaseClient
+                    .from('listings')
+                    .select('id, sold_at, status')
+                    .or('status.eq.sold,sold_at.not.is.null');
+
+                if (!error && soldItems && soldItems.length > 0) {
+                    const expiredIds = soldItems.filter(item => {
+                        if (!item.sold_at) return false;
+                        return (now - new Date(item.sold_at).getTime()) >= TWENTY_FOUR_HOURS_MS;
+                    }).map(item => item.id);
+
+                    if (expiredIds.length > 0) {
+                        await supabaseClient.from('listings').delete().in('id', expiredIds);
+                    }
+                }
+            } catch (err) {
+                console.error("Sold listings cleanup error:", err);
+            }
+        } else {
+            let localListings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+            const initialLen = localListings.length;
+            localListings = localListings.filter(item => {
+                if (item.status === 'sold' && item.sold_at) {
+                    return (now - new Date(item.sold_at).getTime()) < TWENTY_FOUR_HOURS_MS;
+                }
+                return true;
+            });
+            if (localListings.length !== initialLen) {
+                localStorage.setItem('cl_listings', JSON.stringify(localListings));
+            }
+        }
+    },
 
     parseArrayField(value) {
         return parseArrayField(value);
@@ -697,6 +737,8 @@ const app = {
                 this.renderChatSidebar();
                 this.renderChatPane();
                 this.toggleChatSidebar(true);
+            } else if (viewId === 'mylistings') {
+                this.renderMyListingsPage();
             } else if (viewId === 'profile') {
                 this.renderProfile();
             }
@@ -907,7 +949,9 @@ const app = {
             <div class="skeleton-loader-offers" style="grid-column: 1 / -1; height: 160px; border-radius:var(--radius-lg);"></div>
         `;
 
-        this.fetchOffers().then(() => {
+        this.cleanupSoldListings().then(() => {
+            return this.fetchOffers();
+        }).then(() => {
             if (this.isSupabaseEnabled()) {
                 supabaseClient.from("wishlists").select("*").eq("email", this.currentUser.email).maybeSingle().then(({ data: wishlistDoc, error: wishErr }) => {
                     if (wishErr) throw wishErr;
@@ -3872,6 +3916,142 @@ const app = {
         }, 2000);
     },
 
+    async renderMyListingsPage() {
+        if (!this.currentUser) return;
+        await this.cleanupSoldListings();
+
+        let listings = [];
+        let offers = [];
+
+        if (this.isSupabaseEnabled()) {
+            try {
+                const [listingsRes, offersRes] = await Promise.all([
+                    supabaseClient.from('listings').select('*').eq('seller_email', this.currentUser.email).order('created_at', { ascending: false }),
+                    supabaseClient.from('offers').select('*')
+                ]);
+                listings = listingsRes.data || [];
+                offers = offersRes.data || [];
+                this.currentOffersCache = offers;
+            } catch (err) {
+                console.error("Failed to load my listings from cloud:", err);
+                listings = (JSON.parse(localStorage.getItem('cl_listings')) || []).filter(l => l.sellerEmail === this.currentUser.email || l.seller_email === this.currentUser.email);
+            }
+        } else {
+            listings = (JSON.parse(localStorage.getItem('cl_listings')) || []).filter(l => l.sellerEmail === this.currentUser.email || l.seller_email === this.currentUser.email);
+            offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
+        }
+
+        const activeListings = [];
+        const soldListings = [];
+
+        listings.forEach(product => {
+            const acceptedOffer = offers.find(o => String(o.item_id) === String(product.id) && o.status === 'accepted');
+            const isSold = product.status === 'sold' || !!acceptedOffer;
+            if (isSold) {
+                soldListings.push({ ...product, acceptedOffer });
+            } else {
+                activeListings.push(product);
+            }
+        });
+
+        const activeCountEl = document.getElementById('count-active-listings');
+        const soldCountEl = document.getElementById('count-sold-listings');
+        if (activeCountEl) activeCountEl.textContent = activeListings.length;
+        if (soldCountEl) soldCountEl.textContent = soldListings.length;
+
+        const currentTab = this.myListingsTab || 'active';
+        const itemsToRender = currentTab === 'active' ? activeListings : soldListings;
+
+        this.renderMyListingsGrid(itemsToRender, currentTab);
+    },
+
+    switchMyListingsTab(tab) {
+        this.myListingsTab = tab;
+        const activeTabBtn = document.getElementById('mylistings-tab-active');
+        const soldTabBtn = document.getElementById('mylistings-tab-sold');
+
+        if (activeTabBtn && soldTabBtn) {
+            if (tab === 'active') {
+                activeTabBtn.classList.add('active');
+                activeTabBtn.style.color = 'var(--accent-yellow)';
+                activeTabBtn.style.borderBottomColor = 'var(--accent-yellow)';
+                activeTabBtn.style.fontWeight = '700';
+                soldTabBtn.classList.remove('active');
+                soldTabBtn.style.color = 'var(--text-muted)';
+                soldTabBtn.style.borderBottomColor = 'transparent';
+                soldTabBtn.style.fontWeight = '600';
+            } else {
+                soldTabBtn.classList.add('active');
+                soldTabBtn.style.color = 'var(--accent-yellow)';
+                soldTabBtn.style.borderBottomColor = 'var(--accent-yellow)';
+                soldTabBtn.style.fontWeight = '700';
+                activeTabBtn.classList.remove('active');
+                activeTabBtn.style.color = 'var(--text-muted)';
+                activeTabBtn.style.borderBottomColor = 'transparent';
+                activeTabBtn.style.fontWeight = '600';
+            }
+        }
+
+        this.renderMyListingsPage();
+    },
+
+    renderMyListingsGrid(items, tab) {
+        const container = document.getElementById('mylistings-grid');
+        const emptyState = document.getElementById('mylistings-empty-state');
+        const emptyText = document.getElementById('mylistings-empty-text');
+
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!items || items.length === 0) {
+            container.style.display = 'none';
+            if (emptyState) {
+                emptyState.style.display = 'block';
+                if (emptyText) emptyText.textContent = tab === 'active' ? 'You have no active listings.' : 'You have no sold listings.';
+            }
+            return;
+        }
+
+        container.style.display = 'grid';
+        if (emptyState) emptyState.style.display = 'none';
+
+        const placeholderImg = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=600";
+
+        items.forEach(product => {
+            const card = document.createElement('div');
+            card.className = 'product-card glass-panel';
+
+            const productImg = product.image ? product.image : placeholderImg;
+            const isSold = tab === 'sold' || product.status === 'sold' || !!product.acceptedOffer;
+            const badgeHtml = isSold ? `
+                <div style="display: flex; justify-content: center; width: 100%; margin-top: 0.75rem;">
+                    <span class="product-badge-sold">
+                        <i data-lucide="check-circle" style="width: 12px; height: 12px; color: var(--accent-yellow);"></i> Sold${product.acceptedOffer ? ` - Negotiated (₹${product.acceptedOffer.proposed_price})` : ''}
+                    </span>
+                </div>
+            ` : '';
+
+            card.innerHTML = `
+                <div class="product-image" style="position: relative;">
+                    <img src="${productImg}" alt="${product.title}">
+                </div>
+                <div class="product-body">
+                    <div class="product-price">₹${Number(product.price).toLocaleString('en-IN')}</div>
+                    <h3 class="product-title">${product.title}</h3>
+                    <p class="product-desc">${product.description || ''}</p>
+                    <div class="product-meta">
+                        <span><i data-lucide="tag" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${product.category || 'General'}</span>
+                        <span><i data-lucide="star" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${product.condition || 'Good'}</span>
+                    </div>
+                    ${badgeHtml}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        if (window.lucide) lucide.createIcons();
+    },
+
     openSwitchUserModal(e) {
         if (e) {
             e.preventDefault();
@@ -4059,6 +4239,12 @@ const app = {
                 .then(({ error }) => {
                     if (error) throw error;
                     return supabaseClient
+                        .from('listings')
+                        .update({ status: 'sold', sold_at: new Date().toISOString() })
+                        .eq('id', productId);
+                })
+                .then(() => {
+                    return supabaseClient
                         .from('offers')
                         .update({ status: 'declined' })
                         .eq('item_id', productId)
@@ -4069,6 +4255,7 @@ const app = {
                     if (error) console.error("Error auto-declining other offers:", error);
                     this.showToast("Offer accepted! Item marked as Sold.", "success");
                     this.renderProducts();
+                    if (this.currentView === 'mylistings') this.renderMyListingsPage();
                 })
                 .catch(err => {
                     console.error("Accept offer transaction failed:", err);
@@ -4090,8 +4277,19 @@ const app = {
             }
         });
         localStorage.setItem('cl_offers', JSON.stringify(offers));
+
+        const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
+        listings.forEach(l => {
+            if (String(l.id) === String(productId)) {
+                l.status = 'sold';
+                l.sold_at = new Date().toISOString();
+            }
+        });
+        localStorage.setItem('cl_listings', JSON.stringify(listings));
+
         this.showToast("Offer accepted! Item marked as Sold.", "success");
         this.renderProducts();
+        if (this.currentView === 'mylistings') this.renderMyListingsPage();
     },
 
     declineNegotiationOffer(offerId) {

@@ -142,6 +142,7 @@
             <a href="#" onclick="app.navigate('reddit', event); app.closeNavDrawer();">💬 Forum</a>
             <a href="#" onclick="app.navigate('wishlist', event); app.closeNavDrawer();">❤️ Wishlist</a>
             <a href="#" onclick="app.navigate('chat', event); app.closeNavDrawer();">✉️ Messages</a>
+            <a href="#" onclick="app.navigate('mylistings', event); app.closeNavDrawer();">📦 My Listings</a>
             <a href="#" onclick="app.navigate('profile', event); app.closeNavDrawer();">👤 Profile</a>
         </nav>
         <div class="nav-drawer-user" id="nav-drawer-user-info">
@@ -184,6 +185,7 @@
                 <a href="#" class="nav-item" onclick="app.navigate('reddit', event)">Forum <span style="font-size: 0.7rem; opacity: 0.8; vertical-align: middle;">▼</span></a>
                 <a href="#" class="nav-item" onclick="app.navigate('wishlist', event)">Wishlist</a>
                 <a href="#" class="nav-item" id="nav-chat-link" onclick="app.navigate('chat', event)">Messages <span class="badge-unread-dot" id="nav-chat-badge-dot" style="display:none;"></span></a>
+                <a href="#" class="nav-item" id="nav-mylistings-link" onclick="app.navigate('mylistings', event)">My Listings</a>
                 <a href="#" class="nav-item" onclick="app.navigate('profile', event)">Profile</a>
             </nav>
             <div class="nav-right-actions">
@@ -659,6 +661,38 @@
                                 </form>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- View: My Listings -->
+        <div id="view-mylistings" class="view">
+            <section class="section pt-4">
+                <div class="container">
+                    <div class="browse-header-content" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <h2 class="section-title">My Listings</h2>
+                            <p class="section-subtitle">Manage your active and sold products listed on CampusLink</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="app.openModal('post-item-modal')" style="display: flex; align-items: center; gap: 0.5rem; height: 42px; padding: 0 1.25rem;">
+                            <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
+                            <span>Sell Item</span>
+                        </button>
+                    </div>
+
+                    <!-- Sub-Tabs: Active vs Sold -->
+                    <div class="mylistings-tabs" style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
+                        <button class="mylistings-tab active" id="mylistings-tab-active" onclick="app.switchMyListingsTab('active')" style="background: none; border: none; padding: 0.75rem 1.25rem; font-weight: 700; color: var(--accent-yellow); border-bottom: 2px solid var(--accent-yellow); cursor: pointer; font-size: 0.95rem;">Active Listings (<span id="count-active-listings">0</span>)</button>
+                        <button class="mylistings-tab" id="mylistings-tab-sold" onclick="app.switchMyListingsTab('sold')" style="background: none; border: none; padding: 0.75rem 1.25rem; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent; cursor: pointer; font-size: 0.95rem;">Sold Listings (<span id="count-sold-listings">0</span>)</button>
+                    </div>
+
+                    <!-- Grid Container -->
+                    <div id="mylistings-grid" class="products-grid"></div>
+                    <div id="mylistings-empty-state" style="display: none; text-align: center; padding: 4rem 2rem; color: var(--text-muted); background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+                        <i data-lucide="package" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <h4 style="color: var(--text-main); margin-bottom: 0.5rem;">No items found</h4>
+                        <p id="mylistings-empty-text">You have no listings in this tab yet.</p>
                     </div>
                 </div>
             </section>
