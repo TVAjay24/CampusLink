@@ -4760,8 +4760,11 @@ const app = {
     },
 
     handleAdminEventSubmit(event) {
-        event.preventDefault();
+        if (event) event.preventDefault();
         
+        if (this.isSavingAdminEvent) return;
+        this.isSavingAdminEvent = true;
+
         const submitBtn = document.getElementById('admin-event-submit-btn');
         const origBtnText = submitBtn ? submitBtn.textContent : 'Create Event';
         if (submitBtn) {
@@ -4784,6 +4787,7 @@ const app = {
         const is_featured = document.getElementById('admin-event-featured').checked;
 
         const resetBtn = () => {
+            this.isSavingAdminEvent = false;
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = origBtnText;
@@ -4815,20 +4819,20 @@ const app = {
 
                 return promise;
             }).then(({ error }) => {
-                resetBtn();
                 if (error) throw error;
+                resetBtn();
                 this.showToast(id ? "Event updated successfully!" : "Event created successfully!", "success");
                 this.closeAdminModal('admin-event-modal');
                 this.fetchAdminEvents();
             }).catch(err => {
-                resetBtn();
                 console.error("Failed to save event to Supabase:", err);
                 this.showToast("Failed to save event. Trying local database fallback...", "warning");
                 this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+                resetBtn();
             });
         } else {
-            resetBtn();
             this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+            resetBtn();
         }
     },
 
@@ -5048,7 +5052,10 @@ const app = {
     },
 
     handleAdminAnnouncementSubmit(event) {
-        event.preventDefault();
+        if (event) event.preventDefault();
+
+        if (this.isSavingAdminAnn) return;
+        this.isSavingAdminAnn = true;
 
         const submitBtn = document.getElementById('admin-announcement-submit-btn');
         const origBtnText = submitBtn ? submitBtn.textContent : 'Post Announcement';
@@ -5066,6 +5073,7 @@ const app = {
         const expires_at = expiresVal ? new Date(expiresVal).toISOString() : null;
 
         const resetBtn = () => {
+            this.isSavingAdminAnn = false;
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = origBtnText;
@@ -5093,20 +5101,20 @@ const app = {
 
                 return promise;
             }).then(({ error }) => {
-                resetBtn();
                 if (error) throw error;
+                resetBtn();
                 this.showToast(id ? "Announcement saved!" : "Announcement published!", "success");
                 this.closeAdminModal('admin-announcement-modal');
                 this.fetchAdminAnnouncements();
             }).catch(err => {
-                resetBtn();
                 console.error("Failed to save announcement to Supabase:", err);
                 this.showToast("Failed to write to Cloud. Writing locally...", "warning");
                 this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
+                resetBtn();
             });
         } else {
-            resetBtn();
             this.handleAdminAnnouncementSubmitLocally(id, { title, body, priority, is_active, expires_at });
+            resetBtn();
         }
     },
 
