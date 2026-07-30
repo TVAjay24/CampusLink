@@ -938,6 +938,13 @@ const app = {
         if (chip) chip.classList.remove('active');
     },
 
+    isItemSold(product) {
+        if (!product) return false;
+        if (product.status === 'sold') return true;
+        const acceptedOffer = (this.currentOffersCache || []).find(o => String(o.item_id) === String(product.id) && o.status === 'accepted');
+        return !!acceptedOffer;
+    },
+
     // 5. MARKETPLACE (BROWSE / SELL / WISHLIST)
     renderProducts() {
         const grid = document.getElementById('products-grid');
@@ -965,7 +972,8 @@ const app = {
                         sellerEmail: item.seller_email
                     }));
                     this.currentListingsCache = listings;
-                    this.renderListingsToContainer(listings, grid);
+                    const activePublicListings = listings.filter(item => !this.isItemSold(item));
+                    this.renderListingsToContainer(activePublicListings, grid);
                     
                     // Refresh active chat viewport if currently open
                     if (this.currentView === 'chat' && this.activeChatEmail) {
@@ -977,7 +985,8 @@ const app = {
                 });
             } else {
                 const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-                this.renderListingsToContainer(listings, grid);
+                const activePublicListings = listings.filter(item => !this.isItemSold(item));
+                this.renderListingsToContainer(activePublicListings, grid);
                 
                 // Refresh active chat viewport if currently open
                 if (this.currentView === 'chat' && this.activeChatEmail) {
@@ -987,7 +996,8 @@ const app = {
         }).catch(err => {
             console.error("Failed to fetch offers:", err);
             const listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-            this.renderListingsToContainer(listings, grid);
+            const activePublicListings = listings.filter(item => !this.isItemSold(item));
+            this.renderListingsToContainer(activePublicListings, grid);
             
             // Refresh active chat viewport if currently open
             if (this.currentView === 'chat' && this.activeChatEmail) {
@@ -1147,6 +1157,8 @@ const app = {
 
         // Filter Logic
         let filtered = listings.filter(item => {
+            if (this.isItemSold(item)) return false;
+
             const matchesSearch = (item.title || '').toLowerCase().includes(searchVal) || 
                                   (item.description || '').toLowerCase().includes(searchVal) ||
                                   (item.category || '').toLowerCase().includes(searchVal);
