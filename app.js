@@ -5195,12 +5195,25 @@ const app = {
         const dismissals = JSON.parse(sessionStorage.getItem('cl_dismissed_announcements') || '[]');
 
         const renderAnns = (list) => {
-            const activeList = list.filter(ann => {
-                if (!ann.is_active) return false;
+            const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
+            const map = new Map();
+            (list || []).concat(localAnns).forEach(item => {
+                if (item && item.id && !map.has(String(item.id))) {
+                    map.set(String(item.id), item);
+                }
+            });
+            const combinedList = Array.from(map.values());
+
+            const activeList = combinedList.filter(ann => {
+                if (ann.is_active === false) return false;
                 if (dismissals.includes(ann.id) || dismissals.includes(String(ann.id))) return false;
                 if (ann.expires_at && new Date(ann.expires_at) < new Date()) return false;
                 return true;
             });
+
+            // Priority sorting: urgent > high > normal > low
+            const priorityWeight = { urgent: 4, high: 3, normal: 2, low: 1 };
+            activeList.sort((a, b) => (priorityWeight[b.priority] || 2) - (priorityWeight[a.priority] || 2));
 
             if (activeList.length === 0) {
                 container.style.display = 'none';
@@ -5240,17 +5253,14 @@ const app = {
         };
 
         if (this.isSupabaseEnabled()) {
-            supabaseClient.from('announcements').select('*').eq('is_active', true).then(({ data, error }) => {
-                if (error) throw error;
+            supabaseClient.from('announcements').select('*').then(({ data, error }) => {
                 renderAnns(data || []);
             }).catch(err => {
                 console.error("Failed to load announcements for banner:", err);
-                const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
-                renderAnns(localAnns);
+                renderAnns([]);
             });
         } else {
-            const localAnns = JSON.parse(localStorage.getItem('cl_announcements')) || [];
-            renderAnns(localAnns);
+            renderAnns([]);
         }
     },
 
@@ -5266,14 +5276,26 @@ const app = {
         if (!container) return;
 
         const renderEvts = (list) => {
-            const featuredList = list.filter(evt => {
-                if (!evt.is_featured) return false;
+            const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
+            const map = new Map();
+            (list || []).concat(localEvents).forEach(item => {
+                if (item && item.id && !map.has(String(item.id))) {
+                    map.set(String(item.id), item);
+                }
+            });
+            const combinedList = Array.from(map.values());
+
+            const upcomingList = combinedList.filter(evt => {
+                if (!evt.date) return false;
                 const eventDate = new Date(evt.date);
                 eventDate.setHours(23, 59, 59, 999);
                 return eventDate >= new Date();
             });
 
-            if (featuredList.length === 0) {
+            // Sort by date ascending
+            upcomingList.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (upcomingList.length === 0) {
                 container.style.display = 'none';
                 container.innerHTML = '';
                 return;
@@ -5282,7 +5304,7 @@ const app = {
             container.style.display = 'block';
             container.innerHTML = `
                 <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 11px; font-weight: 700; color: #f5c842; letter-spacing: 0.05em; text-transform: uppercase;">Featured Events</span>
+                    <span style="font-size: 11px; font-weight: 700; color: #f5c842; letter-spacing: 0.05em; text-transform: uppercase;">Upcoming Campus Events</span>
                     <div style="flex: 1; height: 1px; background: linear-gradient(90deg, #2a2a33, transparent);"></div>
                 </div>
                 <div class="events-banner-list"></div>
@@ -5290,11 +5312,12 @@ const app = {
 
             const listWrapper = container.querySelector('.events-banner-list');
 
-            featuredList.forEach(evt => {
+            upcomingList.forEach(evt => {
                 const card = document.createElement('div');
                 card.className = 'events-banner-card';
 
                 const timeStr = evt.time ? evt.time.slice(0, 5) : 'All Day';
+                const isFeaturedBadge = evt.is_featured ? `<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700;">FEATURED</span>` : '';
                 const regLinkHtml = evt.registration_link 
                     ? `<a href="${evt.registration_link}" target="_blank" class="admin-btn admin-btn-primary" style="padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block;" onclick="event.stopPropagation();">Register Now</a>` 
                     : `<span style="font-size: 12px; color: #8b8b9a; font-weight: 500;">No link required</span>`;
@@ -5304,7 +5327,10 @@ const app = {
                         <i data-lucide="calendar-heart" style="width: 22px; height: 22px;"></i>
                     </div>
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; font-size: 13.5px; color: #f0f0f4; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">${evt.title}</div>
+                        <div style="font-weight: 700; font-size: 13.5px; color: #f0f0f4; display: flex; align-items: center; gap: 8px;">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${evt.title}</span>
+                            ${isFeaturedBadge}
+                        </div>
                         <div style="font-size: 11.5px; color: #8b8b9a; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;">
                             <span style="font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px;">
                                 <i data-lucide="calendar" style="width: 12px; height: 12px;"></i> ${evt.date}
@@ -5328,17 +5354,14 @@ const app = {
         };
 
         if (this.isSupabaseEnabled()) {
-            supabaseClient.from('events').select('*').eq('is_featured', true).then(({ data, error }) => {
-                if (error) throw error;
+            supabaseClient.from('events').select('*').then(({ data, error }) => {
                 renderEvts(data || []);
             }).catch(err => {
                 console.error("Failed to load events for banner:", err);
-                const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
-                renderEvts(localEvents);
+                renderEvts([]);
             });
         } else {
-            const localEvents = JSON.parse(localStorage.getItem('cl_events')) || [];
-            renderEvts(localEvents);
+            renderEvts([]);
         }
     },
 
