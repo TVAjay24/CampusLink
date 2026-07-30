@@ -1207,7 +1207,7 @@ const app = {
                 });
             } else {
                 let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-                listings = listings.filter(item => item.id !== productId);
+                listings = listings.filter(item => String(item.id) !== String(productId));
                 localStorage.setItem('cl_listings', JSON.stringify(listings));
                 refreshUI();
             }
@@ -1216,7 +1216,7 @@ const app = {
 
     openEditListing(productId) {
         const listings = this.isSupabaseEnabled() ? this.currentListingsCache : (JSON.parse(localStorage.getItem('cl_listings')) || []);
-        const item = listings.find(i => i.id === productId);
+        const item = listings.find(i => String(i.id) === String(productId));
         if (!item) return;
 
         document.getElementById('edit-item-id').value = item.id;
@@ -1482,7 +1482,7 @@ const app = {
 
     applyToTeam(teamId) {
         const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
-        const team = teams.find(t => t.id === teamId);
+        const team = teams.find(t => String(t.id) === String(teamId));
         if (!team) return;
 
         if (team.createdByEmail === this.currentUser.email) {
@@ -1530,7 +1530,7 @@ const app = {
 
     openManageApplicants(teamId) {
         const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
-        const team = teams.find(t => t.id === teamId);
+        const team = teams.find(t => String(t.id) === String(teamId));
         if (!team) return;
 
         document.getElementById('manage-modal-title').textContent = `Applicants: ${team.teamName}`;
@@ -1572,7 +1572,7 @@ const app = {
 
     deleteTeam(teamId) {
         const teams = this.isSupabaseEnabled() ? this.currentTeamsCache : (JSON.parse(localStorage.getItem('cl_teams')) || []);
-        const team = teams.find(t => t.id === teamId);
+        const team = teams.find(t => String(t.id) === String(teamId));
         if (!team) return;
 
         // Safety: only owner can delete
@@ -1733,7 +1733,7 @@ const app = {
 
     openRegisterHackathon(hackId) {
         const hackathons = JSON.parse(localStorage.getItem('cl_hackathons')) || [];
-        const hack = hackathons.find(h => h.id === hackId);
+        const hack = hackathons.find(h => String(h.id) === String(hackId));
         if (!hack) return;
 
         document.getElementById('reg-hackathon-id').value = hack.id;
@@ -1969,7 +1969,7 @@ const app = {
             });
         } else {
             let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-            const post = posts.find(p => p.id === postId);
+            const post = posts.find(p => String(p.id) === String(postId));
             if (!post) return;
 
             const email = this.currentUser.email;
@@ -2102,7 +2102,7 @@ const app = {
 
             // Increment comments count in post
             let posts = JSON.parse(localStorage.getItem('cl_reddit_posts')) || [];
-            const idx = posts.findIndex(p => p.id === postId);
+            const idx = posts.findIndex(p => String(p.id) === String(postId));
             if (idx > -1) {
                 posts[idx].commentsCount = (posts[idx].commentsCount || 0) + 1;
                 localStorage.setItem('cl_reddit_posts', JSON.stringify(posts));
@@ -2585,7 +2585,7 @@ const app = {
             let actionButtonsHtml = '';
             if (msg.text.includes("🚨 Price Proposal:") && !isMe) {
                 const offer = (this.currentOffersCache || []).find(o => 
-                    o.buyer_id === msg.sender && 
+                    String(o.buyer_id) === String(msg.sender) && 
                     o.status === 'pending'
                 );
                 if (offer) {
@@ -3150,7 +3150,7 @@ const app = {
                     });
                 } else {
                     let listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
-                    const idx = listings.findIndex(item => item.id === id);
+                    const idx = listings.findIndex(item => String(item.id) === String(id));
 
                     if (idx > -1) {
                         listings[idx].title = title;
@@ -3703,7 +3703,7 @@ const app = {
             listings = JSON.parse(localStorage.getItem('cl_listings')) || [];
         }
 
-        let item = listings.find(i => i.id === productId);
+        let item = listings.find(i => String(i.id) === String(productId));
         if (!item) {
             item = {
                 id: productId,
@@ -4039,17 +4039,16 @@ const app = {
     },
 
     acceptNegotiationOffer(offerId, productId) {
-        const offer = (this.currentOffersCache || []).find(o => o.id === offerId) || 
-            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => o.id === offerId));
+        const offer = (this.currentOffersCache || []).find(o => String(o.id) === String(offerId)) || 
+            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => String(o.id) === String(offerId)));
         if (offer) {
-            const listings = this.currentListingsCache.length > 0 ? 
+            const listings = (this.currentListingsCache && this.currentListingsCache.length > 0) ? 
                 this.currentListingsCache : 
                 (JSON.parse(localStorage.getItem('cl_listings')) || []);
-            const listing = listings.find(p => p.id === productId);
-            if (listing) {
-                const acceptText = `✅ Offer Accepted: I have accepted your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${listing.title}".`;
-                this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, acceptText);
-            }
+            const listing = listings.find(p => String(p.id) === String(productId));
+            const itemTitle = listing?.title || "listing";
+            const acceptText = `✅ Offer Accepted: I have accepted your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${itemTitle}".`;
+            this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, acceptText);
         }
 
         if (this.isSupabaseEnabled()) {
@@ -4084,9 +4083,9 @@ const app = {
     acceptOfferLocally(offerId, productId) {
         const offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
         offers.forEach(o => {
-            if (o.id === offerId) {
+            if (String(o.id) === String(offerId)) {
                 o.status = 'accepted';
-            } else if (o.item_id === productId && o.status === 'pending') {
+            } else if (String(o.item_id) === String(productId) && o.status === 'pending') {
                 o.status = 'declined';
             }
         });
@@ -4096,17 +4095,16 @@ const app = {
     },
 
     declineNegotiationOffer(offerId) {
-        const offer = (this.currentOffersCache || []).find(o => o.id === offerId) || 
-            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => o.id === offerId));
+        const offer = (this.currentOffersCache || []).find(o => String(o.id) === String(offerId)) || 
+            ((JSON.parse(localStorage.getItem('cl_offers')) || []).find(o => String(o.id) === String(offerId)));
         if (offer) {
-            const listings = this.currentListingsCache.length > 0 ? 
+            const listings = (this.currentListingsCache && this.currentListingsCache.length > 0) ? 
                 this.currentListingsCache : 
                 (JSON.parse(localStorage.getItem('cl_listings')) || []);
-            const listing = listings.find(p => p.id === offer.item_id);
-            if (listing) {
-                const declineText = `❌ Offer Declined: I have declined your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${listing.title}".`;
-                this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, declineText);
-            }
+            const listing = listings.find(p => String(p.id) === String(offer.item_id));
+            const itemTitle = listing?.title || "listing";
+            const declineText = `❌ Offer Declined: I have declined your offer of ₹${offer.proposed_price.toLocaleString('en-IN')} on my listing: "${itemTitle}".`;
+            this.sendSystemFeedbackChatMessage(offer.seller_id, offer.buyer_id, declineText);
         }
 
         if (this.isSupabaseEnabled()) {
@@ -4130,7 +4128,7 @@ const app = {
 
     declineOfferLocally(offerId) {
         const offers = JSON.parse(localStorage.getItem('cl_offers')) || [];
-        const target = offers.find(o => o.id === offerId);
+        const target = offers.find(o => String(o.id) === String(offerId));
         if (target) {
             target.status = 'declined';
             localStorage.setItem('cl_offers', JSON.stringify(offers));
