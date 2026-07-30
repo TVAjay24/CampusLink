@@ -12,6 +12,10 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="styles.css?v=2.7">
+    <!-- Favicon & App Icons -->
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#f5c842">
 </head>
@@ -21,7 +25,10 @@
     <div id="auth-page" class="auth-page">
         <div class="auth-bg-glow"></div>
         <div class="auth-card glass-panel">
-            <div class="auth-logo" ondblclick="app.handleLogoDoubleClick()">Campus<span class="text-accent">Link</span></div>
+            <div class="auth-logo" ondblclick="app.handleLogoDoubleClick()">
+                <img src="logo.svg" alt="CampusLink Icon" class="brand-logo-icon">
+                <span>Campus<span class="text-accent">Link</span></span>
+            </div>
             <div class="auth-tabs">
                 <div class="auth-tab active" id="tab-signin" onclick="app.switchAuthTab('signin')">Sign In</div>
                 <div class="auth-tab" id="tab-signup" onclick="app.switchAuthTab('signup')">Sign Up</div>
@@ -119,7 +126,10 @@
     <!-- Mobile Nav Drawer -->
     <div class="nav-drawer" id="nav-drawer">
         <div class="nav-drawer-header">
-            <span class="nav-drawer-logo" ondblclick="app.handleLogoDoubleClick()">Campus<span class="text-accent">Link</span></span>
+            <span class="nav-drawer-logo" ondblclick="app.handleLogoDoubleClick()" style="display:flex;align-items:center;">
+                <img src="logo.svg" alt="CampusLink Icon" class="brand-logo-icon">
+                <span>Campus<span class="text-accent">Link</span></span>
+            </span>
             <button class="nav-drawer-close" onclick="app.closeNavDrawer()" aria-label="Close menu">
                 <i data-lucide="x" style="width:20px;height:20px;"></i>
             </button>
@@ -164,7 +174,8 @@
     <header class="navbar" id="main-navbar" style="display: none;">
         <div class="container nav-container">
             <a href="#" class="logo" onclick="app.navigate('home')" ondblclick="app.handleLogoDoubleClick()">
-                Campus<span class="text-accent">Link</span>
+                <img src="logo.svg" alt="CampusLink Icon" class="brand-logo-icon">
+                <span>Campus<span class="text-accent">Link</span></span>
             </a>
             <nav class="nav-links" id="main-nav-links">
                 <a href="#" class="nav-item nav-home-pill active" onclick="app.navigate('home', event)">Home</a>
@@ -1114,12 +1125,15 @@
         <!-- SIDEBAR -->
         <aside style="width: 240px; flex-shrink: 0; background: #131316; border-right: 1px solid #2a2a33; padding: 24px 0; display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; z-index: 10;">
             <!-- Logo -->
-            <div style="padding: 0 20px 24px; border-bottom: 1px solid #2a2a33;">
-                <div style="font-size: 18px; font-weight: 700; color: #f5c842; letter-spacing: -0.02em;">
-                    CampusLink
-                </div>
-                <div style="font-size: 11px; font-weight: 600; color: #6C63FF; letter-spacing: 0.08em; margin-top: 2px;">
-                    ADMIN CONSOLE
+            <div style="padding: 0 20px 24px; border-bottom: 1px solid #2a2a33; display: flex; align-items: center; gap: 10px;">
+                <img src="logo.svg" alt="CampusLink Icon" style="width: 32px; height: 32px; filter: drop-shadow(0 2px 6px rgba(245, 200, 66, 0.3));">
+                <div>
+                    <div style="font-size: 18px; font-weight: 700; color: #f5c842; letter-spacing: -0.02em;">
+                        Campus<span style="color:#ffffff;">Link</span>
+                    </div>
+                    <div style="font-size: 10px; font-weight: 600; color: #6C63FF; letter-spacing: 0.08em; margin-top: 2px;">
+                        ADMIN CONSOLE
+                    </div>
                 </div>
             </div>
 

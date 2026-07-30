@@ -171,9 +171,28 @@ h1, h2, h3, h4 {
 }
 
 .logo {
+    display: inline-flex;
+    align-items: center;
     font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: -0.5px;
+}
+
+.brand-logo-icon {
+    height: 1.4em;
+    width: auto;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+    display: inline-block;
+    filter: drop-shadow(0 2px 8px rgba(245, 200, 66, 0.3));
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.logo:hover .brand-logo-icon,
+.nav-drawer-logo:hover .brand-logo-icon,
+.auth-logo:hover .brand-logo-icon {
+    transform: scale(1.12) rotate(4deg);
 }
 
 .nav-links {
@@ -877,11 +896,21 @@ h1, h2, h3, h4 {
 }
 
 .auth-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     text-align: center;
     font-size: 2.25rem;
     font-weight: 800;
     margin-bottom: 2rem;
     font-family: 'Syne', sans-serif;
+    cursor: pointer;
+}
+
+.auth-logo .brand-logo-icon {
+    height: 2.2rem;
+    margin-right: 0;
 }
 
 .auth-tabs {
