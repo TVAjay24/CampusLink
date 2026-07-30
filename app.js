@@ -3703,23 +3703,9 @@ const app = {
         this.openNavDrawer();
     },
 
-    // ---- Filter Bottom Sheet ----
-    openFilterSheet() {
-        const sheet = document.getElementById('filter-bottom-sheet');
-        const overlay = document.getElementById('filter-sheet-overlay');
-        if (sheet) sheet.classList.add('open');
-        if (overlay) overlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        lucide.createIcons();
-    },
-
-    closeFilterSheet() {
-        const sheet = document.getElementById('filter-bottom-sheet');
-        const overlay = document.getElementById('filter-sheet-overlay');
-        if (sheet) sheet.classList.remove('open');
-        if (overlay) overlay.classList.remove('open');
-        document.body.style.overflow = '';
-    },
+    // ---- Filter Bottom Sheet (Deprecated) ----
+    openFilterSheet() {},
+    closeFilterSheet() {},
 
     logout() {
         sessionStorage.setItem('cl_logged_out_once', 'true');

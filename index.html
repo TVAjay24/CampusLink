@@ -269,61 +269,6 @@
                     </div>
                 </div>
                    <section class="browse-content section pt-0">
-                <!-- Mobile: Filter trigger button + FAB -->
-                <div class="container" style="padding-top:1rem;">
-                    <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
-                        <button class="filter-mobile-trigger" id="filter-mobile-trigger" onclick="app.openFilterSheet()">
-                            <i data-lucide="sliders-horizontal"></i> Filters
-                        </button>
-                        <select class="form-control sort-select" id="sort-select-mobile" onchange="document.getElementById('sort-select').value=this.value; app.filterListings();" style="display:none; width:auto; font-size:14px; padding:0.5rem 0.75rem;">
-                            <option value="newest">Newest First</option>
-                            <option value="low-to-high">Price: Low → High</option>
-                            <option value="high-to-low">Price: High → Low</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Filter Bottom Sheet Overlay -->
-                <div class="filter-bottom-sheet-overlay" id="filter-sheet-overlay" onclick="app.closeFilterSheet()"></div>
-                <!-- Filter Bottom Sheet -->
-                <div class="filter-bottom-sheet" id="filter-bottom-sheet">
-                    <div class="filter-sheet-handle"></div>
-                    <div class="filter-sheet-header">
-                        <h4 style="margin:0;">Filter Listings</h4>
-                        <button class="filter-sheet-close" onclick="app.closeFilterSheet()">
-                            <i data-lucide="x" style="width:20px;height:20px;"></i>
-                        </button>
-                    </div>
-                    <div class="filter-group">
-                        <h4>Categories</h4>
-                        <ul class="filter-list">
-                            <li><label><input type="radio" name="category" value="all" checked onchange="app.filterListings()"> All Categories</label></li>
-                            <li><label><input type="radio" name="category" value="Books" onchange="app.filterListings()"> Books</label></li>
-                            <li><label><input type="radio" name="category" value="Electronics" onchange="app.filterListings()"> Electronics</label></li>
-                            <li><label><input type="radio" name="category" value="Lab Equipment" onchange="app.filterListings()"> Lab Equipment</label></li>
-                            <li><label><input type="radio" name="category" value="Furniture" onchange="app.filterListings()"> Furniture</label></li>
-                            <li><label><input type="radio" name="category" value="Notes" onchange="app.filterListings()"> Notes</label></li>
-                        </ul>
-                    </div>
-                    <div class="filter-group">
-                        <h4>Condition</h4>
-                        <ul class="filter-list">
-                            <li><label><input type="checkbox" name="condition" value="New" onchange="app.filterListings()"> New</label></li>
-                            <li><label><input type="checkbox" name="condition" value="Like New" onchange="app.filterListings()"> Like New</label></li>
-                            <li><label><input type="checkbox" name="condition" value="Used" onchange="app.filterListings()"> Used</label></li>
-                        </ul>
-                    </div>
-                    <div class="filter-group">
-                        <h4>Price Range</h4>
-                        <div class="price-inputs">
-                            <input type="number" id="filter-price-min-sheet" placeholder="Min ₹" class="form-control" oninput="document.getElementById('filter-price-min').value=this.value; app.filterListings();">
-                            <span>-</span>
-                            <input type="number" id="filter-price-max-sheet" placeholder="Max ₹" class="form-control" oninput="document.getElementById('filter-price-max').value=this.value; app.filterListings();">
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" style="width:100%;margin-top:1rem;" onclick="app.closeFilterSheet()">Apply Filters</button>
-                </div>
-
                 <!-- FAB: Post Item -->
                 <button class="post-item-fab" id="post-item-fab" onclick="app.navigate('post')" title="Post an item" aria-label="Post item">
                     <i data-lucide="plus"></i>
