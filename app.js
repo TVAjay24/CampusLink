@@ -1234,9 +1234,14 @@ const app = {
     },
 
     buyContactItem(productId) {
-        const listings = this.isSupabaseEnabled() ? this.currentListingsCache : (JSON.parse(localStorage.getItem('cl_listings')) || []);
-        const product = listings.find(p => p.id === productId);
-        if (!product) return;
+        const listings = (this.currentListingsCache && this.currentListingsCache.length > 0) ? 
+            this.currentListingsCache : 
+            (JSON.parse(localStorage.getItem('cl_listings')) || []);
+        const product = listings.find(p => String(p.id) === String(productId));
+        if (!product) {
+            this.showToast("Listing details not found", "error");
+            return;
+        }
 
         const sellerEmail = product.sellerEmail || product.seller_email;
         const sellerName = product.sellerName || product.seller_name || "VVCE Student";
@@ -3954,10 +3959,10 @@ const app = {
     },
 
     openNegotiateModal(productId) {
-        const listings = this.currentListingsCache.length > 0 ? 
+        const listings = (this.currentListingsCache && this.currentListingsCache.length > 0) ? 
             this.currentListingsCache : 
             (JSON.parse(localStorage.getItem('cl_listings')) || []);
-        const product = listings.find(p => p.id === productId);
+        const product = listings.find(p => String(p.id) === String(productId));
         if (!product) {
             this.showToast("Item not found", "error");
             return;
