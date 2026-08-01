@@ -4672,13 +4672,14 @@ const app = {
             const timeStr = evt.time ? evt.time.slice(0, 5) : 'All Day';
             const isFeaturedBadge = evt.is_featured ? '<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-left: 8px;">FEATURED</span>' : '';
             const typeStr = evt.event_type ? evt.event_type.charAt(0).toUpperCase() + evt.event_type.slice(1) : 'Other';
+            const deadlineBadge = evt.registration_deadline ? ` &bull; Reg. Deadline: ${evt.registration_deadline}` : '';
 
             row.innerHTML = `
                 <div>
                     <div style="font-weight: 600; color: #f0f0f4; display: flex; align-items: center; gap: 4px;">
                         ${evt.title} ${isFeaturedBadge}
                     </div>
-                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px;">Type: ${typeStr}</div>
+                    <div style="font-size: 12px; color: #8b8b9a; margin-top: 2px;">Type: ${typeStr}${deadlineBadge}</div>
                 </div>
                 <div style="font-family: 'JetBrains Mono', monospace; color: #f0f0f4;">
                     <div>${evt.date}</div>
@@ -4708,6 +4709,7 @@ const app = {
         document.getElementById('admin-event-submit-btn').textContent = 'Create Event';
         document.getElementById('admin-event-id').value = '';
         document.getElementById('admin-event-form').reset();
+        document.getElementById('admin-event-registration-deadline').value = '';
         this.openAdminModal('admin-event-modal');
     },
 
@@ -4720,6 +4722,7 @@ const app = {
             document.getElementById('admin-event-title').value = evt.title || '';
             document.getElementById('admin-event-date').value = evt.date || '';
             document.getElementById('admin-event-time').value = evt.time ? evt.time.slice(0, 5) : '';
+            document.getElementById('admin-event-registration-deadline').value = evt.registration_deadline || '';
             document.getElementById('admin-event-type').value = evt.event_type || 'technical';
             document.getElementById('admin-event-venue').value = evt.venue || '';
             document.getElementById('admin-event-description').value = evt.description || '';
@@ -4763,6 +4766,7 @@ const app = {
         const date = document.getElementById('admin-event-date').value;
         const timeInput = document.getElementById('admin-event-time').value;
         const time = timeInput ? timeInput + ":00" : null;
+        const registration_deadline = document.getElementById('admin-event-registration-deadline').value;
         const event_type = document.getElementById('admin-event-type').value;
         const venue = document.getElementById('admin-event-venue').value.trim();
         const description = document.getElementById('admin-event-description').value.trim();
@@ -4780,6 +4784,14 @@ const app = {
             }
         };
 
+        if (registration_deadline && date) {
+            if (registration_deadline > date) {
+                resetBtn();
+                this.showToast("Registration deadline cannot be after the event date!", "error");
+                return;
+            }
+        }
+
         if (this.isSupabaseEnabled()) {
             supabaseClient.auth.getSession().then(({ data: { session } }) => {
                 const userId = session && session.user ? session.user.id : null;
@@ -4787,6 +4799,7 @@ const app = {
                     title,
                     date,
                     time,
+                    registration_deadline: registration_deadline || null,
                     event_type,
                     venue: venue || null,
                     description: description || null,
@@ -4813,11 +4826,11 @@ const app = {
             }).catch(err => {
                 console.error("Failed to save event to Supabase:", err);
                 this.showToast("Failed to save event. Trying local database fallback...", "warning");
-                this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+                this.handleAdminEventSubmitLocally(id, { title, date, time, registration_deadline: registration_deadline || null, event_type, venue, description, registration_link, is_featured });
                 resetBtn();
             });
         } else {
-            this.handleAdminEventSubmitLocally(id, { title, date, time, event_type, venue, description, registration_link, is_featured });
+            this.handleAdminEventSubmitLocally(id, { title, date, time, registration_deadline: registration_deadline || null, event_type, venue, description, registration_link, is_featured });
             resetBtn();
         }
     },
@@ -5476,9 +5489,28 @@ const app = {
 
                 const timeStr = evt.time ? evt.time.slice(0, 5) : 'All Day';
                 const isFeaturedBadge = evt.is_featured ? `<span style="background: rgba(245, 200, 66, 0.15); color: #f5c842; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700;">FEATURED</span>` : '';
-                const regLinkHtml = evt.registration_link 
-                    ? `<a href="${evt.registration_link}" target="_blank" class="admin-btn admin-btn-primary" style="padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block;" onclick="event.stopPropagation();">Register Now</a>` 
-                    : `<span style="font-size: 12px; color: #8b8b9a; font-weight: 500;">No link required</span>`;
+
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const isPastDeadline = evt.registration_deadline ? todayStr > evt.registration_deadline : false;
+
+                let deadlineHtml = '';
+                if (evt.registration_deadline) {
+                    const deadlineFormatted = new Date(evt.registration_deadline + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                    deadlineHtml = `
+                        <span style="font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 4px; color: ${isPastDeadline ? '#ef4444' : '#f5c842'}; font-weight: 600;">
+                            <i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> Register by ${deadlineFormatted}
+                        </span>
+                    `;
+                }
+
+                let regLinkHtml = '';
+                if (isPastDeadline) {
+                    regLinkHtml = `<button disabled class="admin-btn" style="padding: 6px 12px; font-size: 12px; font-weight: 600; background: rgba(255, 255, 255, 0.08); color: #8b8b9a; border: 1px solid rgba(255, 255, 255, 0.1); cursor: not-allowed; opacity: 0.65; pointer-events: none;" onclick="event.stopPropagation();">Registration Closed</button>`;
+                } else if (evt.registration_link) {
+                    regLinkHtml = `<a href="${evt.registration_link}" target="_blank" class="admin-btn admin-btn-primary" style="padding: 6px 12px; font-size: 12px; font-weight: 600; text-decoration: none; display: inline-block;" onclick="event.stopPropagation();">Register Now</a>`;
+                } else {
+                    regLinkHtml = `<span style="font-size: 12px; color: #8b8b9a; font-weight: 500;">No link required</span>`;
+                }
 
                 card.innerHTML = `
                     <div style="background: rgba(245, 200, 66, 0.08); width: 44px; height: 44px; border-radius: 8px; display: flex; flex-shrink: 0; align-items: center; justify-content: center; color: #f5c842;">
@@ -5499,6 +5531,7 @@ const app = {
                             <span style="display: flex; align-items: center; gap: 4px;">
                                 <i data-lucide="map-pin" style="width: 12px; height: 12px;"></i> ${evt.venue || 'TBD'}
                             </span>
+                            ${deadlineHtml}
                         </div>
                     </div>
                     <div style="flex-shrink: 0;">
